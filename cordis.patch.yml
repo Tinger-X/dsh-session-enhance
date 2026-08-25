@@ -1,0 +1,22 @@
+# dsh-session-manager 插件补丁：禁用默认服务行，替换为带物理删除
+# 与拖拽归属修改增强的会话管理实现。安装命令：
+#   dsh plugin --profile web add .
+# 物理删除增强：删除会话转录目录（含子代理级联）后，直接清扫
+# ~/storages/*.json（workspace.json / session_projcache.json 等），
+# 确保磁盘上不再残留该会话的任何记账痕迹。
+- id: workspace
+  disabled: true
+- id: session-projection-cache
+  disabled: true
+- id: ui-workspace
+  disabled: true
+- insert:
+    - id: workspace-dsh-session-manager
+      name: 'dsh-session-manager/workspace'
+    - id: session-projection-cache-dsh-session-manager
+      name: 'dsh-session-manager/projcache'
+      config:
+        writeEveryEvents: 200
+        writeIntervalMs: 5000
+    - id: ui-workspace-dsh-session-manager
+      name: 'dsh-session-manager'
