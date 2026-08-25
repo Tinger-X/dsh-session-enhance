@@ -1,5 +1,5 @@
 {
-  "name": "dsh-session-manager",
+  "name": "dsh-session-enhance",
   "version": "0.1.1",
   "description": "DSH Web plugin for managing sessions: archive/unarchive, guaranteed physical deletion (transcript files + ~/storages/*.json sweep), and drag-and-drop workspace reassignment.",
   "type": "module",
@@ -53,19 +53,14 @@
     "@deepseek-ai/dsh-typert-protocol": "0.1.1-rc.2",
     "@deepseek-ai/dsh-workspace": "0.1.1-rc.2"
   },
-  "pnpm": {
-    "overrides": {
-      "@deepseek-ai/dsh-invariants": "0.1.1-rc.2"
-    }
-  },
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Tinger-X/dsh-session-manager.git"
+    "url": "git+https://github.com/Tinger-X/dsh-session-enhance.git"
   },
-  "homepage": "https://github.com/Tinger-X/dsh-session-manager#readme",
+  "homepage": "https://github.com/Tinger-X/dsh-session-enhance#readme",
   "bugs": {
-    "url": "https://github.com/Tinger-X/dsh-session-manager/issues"
+    "url": "https://github.com/Tinger-X/dsh-session-enhance/issues"
   },
   "publishConfig": {
     "access": "public",

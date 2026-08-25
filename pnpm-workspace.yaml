@@ -1,0 +1,6 @@
+# pnpm 设置（pnpm 11.21+ 从 pnpm-workspace.yaml 读取，package.json 的
+# "pnpm" 字段已被忽略）。
+# overrides：强制 @deepseek-ai/dsh-invariants → 0.1.1-rc.2，绕过其损坏的
+# ^0.1.1 传递范围（任何 registry 上都没有满足该范围的发布版本）。
+overrides:
+  "@deepseek-ai/dsh-invariants": 0.1.1-rc.2

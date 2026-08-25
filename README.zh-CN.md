@@ -21,7 +21,7 @@
 
 ## 🧩 为什么不用自带的归档功能？
 
-| 能力 | 原生 DSH / 基础归档插件 | **dsh-session-manager** |
+| 能力 | 原生 DSH / 基础归档插件 | **dsh-session-enhance** |
 |---|---|---|
 | 归档 / 取消归档 / 批量恢复 | ✅ | ✅（同语义） |
 | 删除时移除转录目录 | ⚠️ 单次 rm，无重试 | ✅ **3 次重试**（Windows 句柄释放） |
@@ -43,7 +43,7 @@
 ```powershell
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $OutputEncoding = [System.Text.Encoding]::UTF8
-dsh plugin --profile web add github:Tinger-X/dsh-session-manager
+dsh plugin --profile web add github:Tinger-X/dsh-session-enhance
 dsh --profile web --dump-config
 ```
 
@@ -52,15 +52,15 @@ dsh --profile web --dump-config
 ### 2️⃣ 从 npm（稳定版本）
 
 ```powershell
-dsh plugin --profile web add dsh-session-manager
+dsh plugin --profile web add dsh-session-enhance
 dsh --profile web --dump-config
 ```
 
 ### 3️⃣ 从源码（开发 / 本地改动）
 
 ```powershell
-git clone https://github.com/Tinger-X/dsh-session-manager.git
-Set-Location dsh-session-manager
+git clone https://github.com/Tinger-X/dsh-session-enhance.git
+Set-Location dsh-session-enhance
 pnpm install
 dsh plugin --profile web add .
 dsh --profile web --dump-config
@@ -69,7 +69,7 @@ dsh --profile web --dump-config
 `dsh plugin add` 执行 pnpm add，并自动把声明了 `dsh.bundle.patch` 的依赖追加进 profile 的 `dsh.profile.bundles`。
 
 > **验证**：`--dump-config` 应出现三行服务：
-> `workspace-dsh-session-manager`、`session-projection-cache-dsh-session-manager`、`ui-workspace-dsh-session-manager`
+> `workspace-dsh-session-enhance`、`session-projection-cache-dsh-session-enhance`、`ui-workspace-dsh-session-enhance`
 
 重启 DSH Web 并强制刷新（Ctrl+F5）。设置中 **Connectors 之后**出现「归档管理」入口（专属归档盒图标）。
 
@@ -95,7 +95,7 @@ dsh --profile web --dump-config
 ## 🏗 架构
 
 ```
-lib/index.js          根宿主入口（ui-workspace-dsh-session-manager）
+lib/index.js          根宿主入口（ui-workspace-dsh-session-enhance）
 lib/workspace.js      工作区注册表服务：归档语义、物理删除、moveSession（物理移动）、syncRecords
 lib/projcache.js      投影缓存服务（墓碑守护写入）
 lib/session-move.js   物理移动核心：转录目录迁移 + zstd 帧布局感知的工件 header.cwd 改写

@@ -21,7 +21,7 @@ A community plugin, derived from [@michengai/dsh-archive-manager](https://github
 
 ## 🧩 Why not the stock archive manager?
 
-| Capability | Stock DSH / basic archive plugins | **dsh-session-manager** |
+| Capability | Stock DSH / basic archive plugins | **dsh-session-enhance** |
 |---|---|---|
 | Archive / unarchive / batch restore | ✅ | ✅ (same semantics) |
 | Delete removes the transcript directory | ⚠️ single `rm`, no retry | ✅ **3 retry attempts** (Windows handle release) |
@@ -43,7 +43,7 @@ A community plugin, derived from [@michengai/dsh-archive-manager](https://github
 ```powershell
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $OutputEncoding = [System.Text.Encoding]::UTF8
-dsh plugin --profile web add github:Tinger-X/dsh-session-manager
+dsh plugin --profile web add github:Tinger-X/dsh-session-enhance
 dsh --profile web --dump-config
 ```
 
@@ -52,15 +52,15 @@ Installs straight from the repository — no registry involved, always the lates
 ### 2️⃣ From npm (stable releases)
 
 ```powershell
-dsh plugin --profile web add dsh-session-manager
+dsh plugin --profile web add dsh-session-enhance
 dsh --profile web --dump-config
 ```
 
 ### 3️⃣ From source (development / local changes)
 
 ```powershell
-git clone https://github.com/Tinger-X/dsh-session-manager.git
-Set-Location dsh-session-manager
+git clone https://github.com/Tinger-X/dsh-session-enhance.git
+Set-Location dsh-session-enhance
 pnpm install
 dsh plugin --profile web add .
 dsh --profile web --dump-config
@@ -69,7 +69,7 @@ dsh --profile web --dump-config
 `dsh plugin add` runs `pnpm add` and automatically appends packages that declare `dsh.bundle.patch` to the profile's `dsh.profile.bundles`.
 
 > **Verify** — `--dump-config` should list three service rows:
-> `workspace-dsh-session-manager`, `session-projection-cache-dsh-session-manager`, `ui-workspace-dsh-session-manager`
+> `workspace-dsh-session-enhance`, `session-projection-cache-dsh-session-enhance`, `ui-workspace-dsh-session-enhance`
 
 Restart DSH Web and hard-refresh the browser (Ctrl+F5). The **归档管理** entry appears in Settings, right after **Connectors**, with a dedicated archive-box icon.
 
@@ -95,7 +95,7 @@ Why? Range resolution can pull newer release candidates whose transitive depende
 ## 🏗 Architecture
 
 ```
-lib/index.js          Host entry (ui-workspace-dsh-session-manager)
+lib/index.js          Host entry (ui-workspace-dsh-session-enhance)
 lib/workspace.js      Workspace registry service: archive semantics, physical
                       deletion, moveSession (physical move), syncRecords
 lib/projcache.js      Projection-cache service (tombstone-guarded writes)
