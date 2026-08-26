@@ -147,3 +147,139 @@ test("disposeStaleAgent: no live agent is a no-op", async () => {
 	await registry.disposeStaleAgent(SID);
 	assert.ok(true, "no crash when no agent exists");
 });
+
+/** 假投影缓存：内存 Map 支撑 requireTable().get 与 rehome（保持行内容）。 */
+function fakeProjCache(initial) {
+	const rows = new Map(Object.entries(initial ?? {}));
+	return {
+		rows,
+		requireTable: () => ({ get: (id) => rows.get(id) }),
+		rehome: async (id, identity) => {
+			const record = rows.get(id);
+			if (record === void 0) return;
+			rows.set(id, { identity, rows: record.rows });
+		}
+	};
+}
+
+function makeReconcileRegistry(projCache) {
+	const registry = Object.create(SessionEnhanceWorkspaceRegistry.prototype);
+	registry.ctx = {
+		get: (name) => name === "sessionProjectionCache" ? projCache : void 0,
+		logger: { warn() {}, info() {} }
+	};
+	return registry;
+}
+
+test("reconcileMovedProjectionIdentities: rehomes a stale cwd to the physical header cwd", async () => {
+	const projCache = fakeProjCache({
+		[SID]: { identity: { createdAt: CREATED_AT, cwd: OLD_CWD }, rows: ROWS }
+	});
+	const rehomed = await makeReconcileRegistry(projCache).reconcileMovedProjectionIdentities([
+		{ id: SID, createdAt: CREATED_AT, cwd: NEW_CWD }
+	]);
+	assert.deepEqual(rehomed, [SID]);
+	assert.deepEqual(projCache.rows.get(SID).identity, { createdAt: CREATED_AT, cwd: NEW_CWD });
+	assert.deepEqual(projCache.rows.get(SID).rows, ROWS, "rows preserved (log content unchanged)");
+});
+
+test("reconcileMovedProjectionIdentities: leaves a matching identity untouched", async () => {
+	const projCache = fakeProjCache({
+		[SID]: { identity: { createdAt: CREATED_AT, cwd: NEW_CWD }, rows: ROWS }
+	});
+	const rehomed = await makeReconcileRegistry(projCache).reconcileMovedProjectionIdentities([
+		{ id: SID, createdAt: CREATED_AT, cwd: NEW_CWD }
+	]);
+	assert.deepEqual(rehomed, [], "no rehome when stored cwd already matches the header");
+});
+
+test("reconcileMovedProjectionIdentities: skips a different lifecycle (createdAt mismatch)", async () => {
+	const projCache = fakeProjCache({
+		[SID]: { identity: { createdAt: CREATED_AT, cwd: OLD_CWD }, rows: ROWS }
+	});
+	const rehomed = await makeReconcileRegistry(projCache).reconcileMovedProjectionIdentities([
+		{ id: SID, createdAt: CREATED_AT + 1, cwd: NEW_CWD }
+	]);
+	assert.deepEqual(rehomed, [], "a recreated id (different createdAt) must not be rehomed");
+	assert.equal(projCache.rows.get(SID).identity.cwd, OLD_CWD, "stale-lifecycle row left intact");
+});
+
+test("reconcileMovedProjectionIdentities: absent row is skipped (cold read rebuilds it)", async () => {
+	const projCache = fakeProjCache();
+	const rehomed = await makeReconcileRegistry(projCache).reconcileMovedProjectionIdentities([
+		{ id: SID, createdAt: CREATED_AT, cwd: NEW_CWD }
+	]);
+	assert.deepEqual(rehomed, []);
+	assert.equal(projCache.rows.size, 0);
+});
+
+test("reconcileMovedProjectionIdentities: absent projection-cache service returns []", async () => {
+	const rehomed = await makeReconcileRegistry(void 0).reconcileMovedProjectionIdentities([
+		{ id: SID, createdAt: CREATED_AT, cwd: NEW_CWD }
+	]);
+	assert.deepEqual(rehomed, []);
+});
+
+test("reconcileMovedProjectionIdentities: a header without a cwd rehomes to a cwd-less identity", async () => {
+	const projCache = fakeProjCache({
+		[SID]: { identity: { createdAt: CREATED_AT, cwd: OLD_CWD }, rows: ROWS }
+	});
+	const rehomed = await makeReconcileRegistry(projCache).reconcileMovedProjectionIdentities([
+		{ id: SID, createdAt: CREATED_AT }
+	]);
+	assert.deepEqual(rehomed, [SID]);
+	assert.deepEqual(projCache.rows.get(SID).identity, { createdAt: CREATED_AT }, "cwd dropped from identity when the header has none");
+});
+
+/** 直接构造实例（跳过字段初始化器）并注入桩 ctx，验证后台预热挑选逻辑。 */
+function makeWarmCache({ list, rows = [], live = [], deleted = [], coldRead, coldSnapshot } = {}) {
+	const cache = Object.create(SessionEnhanceProjectionCache.prototype);
+	const rowSet = new Set(rows);
+	const liveSet = new Set(live);
+	cache.deletedSessionIds = new Set(deleted);
+	cache.warmConcurrency = 2;
+	cache.requireTable = () => ({ get: (id) => rowSet.has(id) ? {} : void 0 });
+	cache.coldSnapshot = coldSnapshot ?? (async (id) => {
+		coldRead?.push(id);
+	});
+	cache.ctx = {
+		sessionPersistence: list === void 0 ? void 0 : { list: async () => list.map((id) => ({ id })) },
+		get: (name) => name === "sessions" ? { get: (id) => liveSet.has(id) ? {} : void 0 } : void 0,
+		logger: { info() {}, warn() {} }
+	};
+	return cache;
+}
+
+test("warmUncachedProjections: cold-reads only uncached, non-live, non-deleted sessions", async () => {
+	const coldRead = [];
+	const cache = makeWarmCache({
+		list: ["has-row", "live-1", "dead-1", "cold-a", "cold-b"],
+		rows: ["has-row"],
+		live: ["live-1"],
+		deleted: ["dead-1"],
+		coldRead
+	});
+	await cache.warmUncachedProjections();
+	assert.deepEqual(coldRead.sort(), ["cold-a", "cold-b"], "only sessions with no row, not live, not tombstoned are warmed");
+});
+
+test("warmUncachedProjections: one failing cold read does not abort the rest", async () => {
+	const coldRead = [];
+	const cache = makeWarmCache({
+		list: ["boom", "ok-1", "ok-2"],
+		coldRead,
+		coldSnapshot: async (id) => {
+			coldRead.push(id);
+			if (id === "boom") throw new Error("cold-read blew up");
+		}
+	});
+	await cache.warmUncachedProjections();
+	assert.deepEqual(coldRead.sort(), ["boom", "ok-1", "ok-2"], "every candidate is attempted despite a failure");
+});
+
+test("warmUncachedProjections: absent persistence.list is a contained no-op", async () => {
+	const coldRead = [];
+	const cache = makeWarmCache({ list: void 0, coldRead });
+	await cache.warmUncachedProjections();
+	assert.deepEqual(coldRead, [], "nothing warmed and no throw when persistence cannot list");
+});
