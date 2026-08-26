@@ -14,6 +14,7 @@ const required = [
   "lib/projcache.js",
   "lib/message-edit.js",
   "lib/session-move.js",
+  "lib/settings.js",
   "lib/client.js",
   "LICENSE",
   "README.md"
