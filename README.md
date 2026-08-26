@@ -19,6 +19,17 @@ A community plugin, derived from [@michengai/dsh-archive-manager](https://github
 | 🖱️ | **Drag & drop reassignment** | Drag a session onto another workspace group (or *ungrouped*) in the sidebar. The **transcript files physically move** to the target workspace's session directory, and the artifact header's `cwd` is rewritten — accounting-only moves that silently drop sessions from the sidebar are impossible. |
 | 🔄 | **Record sync** | One click reconciles `~/storages/*.json` against the physical session files: ghosts are purged, misattributed sessions are corrected, missing accounting is restored. Immune to manual file edits or deletions. |
 | ✏️ | **Message editing** | From the conversation **Timeline** view: edit any user/assistant text block, retry a turn, or reroll the last assistant reply — every operation forks a **reversible version branch** (truncate or preserve downstream turns), with full version-tree navigation and undo/redo. |
+| 📋 | **Copy session ID** | One click on **Copy ID** in the sidebar session menu puts the conversation's session id on your clipboard — handy for sharing, debugging, and reconciling transcript directories. |
+
+## 📸 Screenshots
+
+![Manage archived sessions in Settings](assets/screenshots/archived-sessions.png)
+
+Manage archived sessions in **Settings → 归档管理**: search, sort, filter by workspace, **同步记录** (sync records), restore and delete.
+
+![Archive a session from the sidebar menu](assets/screenshots/archive-session-menu.png)
+
+Archive any session straight from the sidebar session menu.
 
 ## 📸 Screenshots
 
@@ -111,6 +122,7 @@ Why? Range resolution can pull newer release candidates whose transitive depende
    - **Retry** — re-run a turn with its original user input.
    - **Reroll** — regenerate the newest assistant reply (truncate).
    - Every operation opens a **version branch**; the Timeline lists all versions with parent links, an undo stack, and redo targets. Deleting a derived branch (via this plugin's delete) never breaks the parent's timeline.
+7. **Copy session ID** — sidebar session menu → *Copy ID*: copies the conversation's session id to the clipboard (also available on archived sessions).
 
 ## 🏗 Architecture
 

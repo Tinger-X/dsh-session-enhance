@@ -51,6 +51,8 @@ test("merged client bundle registers one factory and applies both halves", async
 	assert.equal(typeof bundleExports.__test?.deriveGroups, "function");
 	// message-edit 客户端的会话消失终态文案随 bundle 内联。
 	assert.ok(registration.factory.toString().includes("会话不存在或已被删除。"));
+	// 会话菜单的复制ID 词条随 bundle 内联。
+	assert.ok(registration.factory.toString().includes('"menu.copySessionId": "复制ID"'));
 
 	const registeredSlots = [];
 	const ctx = {
