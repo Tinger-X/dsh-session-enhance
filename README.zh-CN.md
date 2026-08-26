@@ -1,6 +1,6 @@
-# 📦 DSH Session Manager
+# 📦 DSH Session Enhance
 
-**DeepSeek Harness Web 会话管理全能插件——归档、物理删除、拖拽跨工作区移动，让记录永远与磁盘真实一致。**
+**DeepSeek Harness Web 会话增强全能插件——归档、物理删除、拖拽跨工作区移动，让记录永远与磁盘真实一致；会话消息可编辑、可重试、可重新生成，每次改动都是可逆版本分支。**
 
 ![License](https://img.shields.io/badge/license-Apache--2.0-blue) ![DSH](https://img.shields.io/badge/DSH-0.1.1--rc.2-green) ![Node](https://img.shields.io/badge/node-%5E22.19%20%7C%7C%20%3E%3D24-339933) ![Type](https://img.shields.io/badge/type-ESM-4B32C3)
 
@@ -8,7 +8,7 @@
 
 ---
 
-社区插件，派生自 [@michengai/dsh-archive-manager](https://github.com/MichengAI/dsh-archive-manager)（Apache-2.0），打磨为**会话管理工具箱**：每个动作都是真实的文件系统操作，每次删除都可验证，`~/storages/*.json` 里的每条记录都保证与磁盘上的物理会话文件一致。
+社区插件，派生自 [@michengai/dsh-archive-manager](https://github.com/MichengAI/dsh-archive-manager)（Apache-2.0），打磨为**会话增强工具箱**，并合入 [dsh-message-edit](https://github.com/Moeblack/dsh-message-edit)（MIT）的消息编辑引擎：每个动作都是真实的文件系统操作，每次删除都可验证，`~/storages/*.json` 里的每条记录都保证与磁盘上的物理会话文件一致，每次对话编辑都是一条可逆分支。
 
 ## ✨ 亮点
 
@@ -18,6 +18,7 @@
 | 🗑️ | **真实物理删除** | 真实删除转录目录（带重试，应对 Windows 句柄延迟释放），级联删除子代理、清理 spill，**并直接清扫 `~/storages/*.json`** 让幽灵记录无处藏身——删除后还会*验证*磁盘并告警残留。 |
 | 🖱️ | **拖拽修改归属** | 侧栏把会话拖到另一个工作区分组（或「未分组」），**转录文件真实搬移到目标工作区目录**，工件 header 的 `cwd` 同步改写——只改记账导致会话从侧栏消失的隐患不复存在。 |
 | 🔄 | **同步记录** | 一键按物理会话文件对账 `~/storages/*.json`：清理幽灵、修正归属、补记漏记。手动改文件/删文件后记录漂移？一键自愈。 |
+| ✏️ | **消息编辑** | 会话 **Timeline** 视图：编辑任意用户/助手文本块、重试某个回合、重新生成最近一次回复——每次操作都分叉为**可逆版本分支**（截断或保留下游回合），完整版本树导航 + undo/redo。 |
 
 ## 🧩 为什么不用自带的归档功能？
 
@@ -68,10 +69,10 @@ dsh --profile web --dump-config
 
 `dsh plugin add` 执行 pnpm add，并自动把声明了 `dsh.bundle.patch` 的依赖追加进 profile 的 `dsh.profile.bundles`。
 
-> **验证**：`--dump-config` 应出现三行服务：
-> `workspace-dsh-session-enhance`、`session-projection-cache-dsh-session-enhance`、`ui-workspace-dsh-session-enhance`
+> **验证**：`--dump-config` 应出现四行服务：
+> `workspace-dsh-session-enhance`、`session-projection-cache-dsh-session-enhance`、`message-edit-dsh-session-enhance`、`ui-workspace-dsh-session-enhance`
 
-重启 DSH Web 并强制刷新（Ctrl+F5）。设置中 **Connectors 之后**出现「归档管理」入口（专属归档盒图标）。
+重启 DSH Web 并强制刷新（Ctrl+F5）。设置中 **Connectors 之后**出现「归档管理」入口（专属归档盒图标）；每个会话出现 **Timeline** 页签（紧随 **Trajectory** 之后）。
 
 ### ⚠️ 源码安装的 registry 说明
 
@@ -87,10 +88,19 @@ dsh --profile web --dump-config
 4. **拖拽移动** — 把会话行拖到另一个工作区分组头部（或其他分组的会话行上），或拖到 **未分组** 解除全部工作区归属：
    - 转录目录物理搬移，工件 header `cwd` 改写，变更落盘 `~/storages/workspace.json`。
    - 拖到「未分组」时文件留在原地（未分组没有目标路径）。
-   - **正在运行**的会话会先 flush + detach（释放写路径与文件句柄）再移动，之后重新打开即可。
+   - **正在运行**的会话会先 flush + detach（释放写路径与文件句柄），同时释放仍持有已脱离会话对象的旧 agent（否则后续消息会被写进脱离对象、静默丢失），之后重新打开即可。
+   - 移动后立即改写投影缓存行的日志身份（`session_projcache.json` 的 cwd），标题/统计等投影继续从侧栏正常服务（不再回退显示目标工作区名直到重新打开）；`同步记录` 会一并修复此前已移动但身份陈旧的存量会话。
+   - 移动成功后侧栏重拉会话基线，实时移动的会话立即出现在新工作区，无需刷新页面。
+   - 若移动的是**当前打开的会话**：base 客户端会把该会话的常驻实例标记为 removed（输入框变「会话不可用」且刷新前不再复位），本插件会在移动后自动重新打开该会话并清除该标记（含 2 秒窗口内处理晚到的 `host/session-removed` 帧），输入框立即恢复可用，可继续对话。
+   - 移动后会清理被带进目标目录的相反编码遗留工件（例如共享 `~/.dsh/sessions` 的另一 dsh 实例以不同编码写入的明文 `session.jsonl`；严格读取器会因此拒绝该会话并让 `session.list` 整体 500）。`同步记录` 也会清理这类文件并在结果中报告。
    - 同组内拖拽保持原有排序行为。
 5. **删除** — 单条 / 按项目 / 全部删除，一律确认：
    `flush → detach → 记账清理 → 投影缓存行删除 → 子代理级联 → spill 清理 → 转录目录删除（重试）→ storages JSON 清扫 → 磁盘验证`
+6. **编辑消息** — 打开会话，切到 **Timeline** 视图：
+   - **编辑** — 点击任意用户/助手文本块替换内容，选择 *截断*（丢弃被编辑回合之后的一切）或 *保留*（重排队下游用户消息）。
+   - **重试** — 用原始用户输入重跑某个回合。
+   - **重新生成** — 重新生成最近一次助手回复（截断）。
+   - 每次操作都打开一个**版本分支**；Timeline 列出全部版本（含父链、undo 栈、redo 目标）。用本插件删除派生分支不会破坏父会话的时间线。
 
 ## 🏗 架构
 
@@ -98,12 +108,22 @@ dsh --profile web --dump-config
 lib/index.js          根宿主入口（ui-workspace-dsh-session-enhance）
 lib/workspace.js      工作区注册表服务：归档语义、物理删除、moveSession（物理移动）、syncRecords
 lib/projcache.js      投影缓存服务（墓碑守护写入）
+lib/message-edit.js   消息编辑宿主行：回合原子版本分支（edit/retry/reroll）、
+                      谱系时间线投影、/message-edit HTTP 路由（会话不存在返回 404）
 lib/session-move.js   物理移动核心：转录目录迁移 + zstd 帧布局感知的工件 header.cwd 改写
                      （首帧校验、失败自动回滚）
 lib/storage-sweep.js  ~/storages/*.json 直接磁盘清扫（递归痕迹移除、原子写、无变化不写）
 lib/tombstone.js      通用 FIFO 墓碑簿记
-lib/client.js         浏览器 bundle：侧栏菜单、归档管理设置页、拖拽、导航图标
+lib/client.js         合并浏览器 bundle：侧栏菜单、归档管理设置页、拖拽、导航图标、
+                     Timeline 视图与会话头部控件（单一 loader 模块）
 ```
+
+### HTTP 路由
+
+| 端点 | 用途 |
+|---|---|
+| `GET /message-edit?sessionId=...` | 时间线投影（可编辑消息、可重试回合、版本树、undo/redo）；会话已删返回 `404`，投影冲突返回 `409` |
+| `POST /message-edit` | 执行一次版本操作（`edit` / `retry` / `reroll`），返回新分支会话 id |
 
 ### 程序化 API（`workspaceRegistry` Typert Remotes）
 
@@ -131,13 +151,17 @@ lib/client.js         浏览器 bundle：侧栏菜单、归档管理设置页、
 
 ```powershell
 pnpm build    # 包结构校验
-pnpm test     # node --test（storage-sweep + session-move 两套测试）
+pnpm test     # node --test（storage-sweep + session-move + message-edit + merged-client 四套测试）
 ```
 
 测试覆盖：
 
 - `test/storage-sweep.test.mjs` — 递归痕迹移除、原子改写、非法/缺失文件容错、全目录清扫
 - `test/session-move.test.mjs` — 迁移 + header 改写、真实后端 `readRaw` 形态（`{ meta, content }`）、幂等 no-op、**失败回滚且工件严格可读**、明文工件、无 raw 能力时响亮拒绝
+- `test/message-edit.test.mjs` — 回合折叠、edit/retry/reroll 计划、请求体校验、种子与版本事件投影（含旧格式）
+- `test/merged-client.test.mjs` — 合并 bundle 单一 loader 注册；两个半区 apply 均执行；inject 为并集；disposer 契约保留
+
+客户端 bundle 由脚本生成：`node scripts/merge-client.mjs` 把 dsh-message-edit 的浏览器 bundle 内联进 `lib/client.js`（重新合并前先用 `git checkout -- lib/client.js` 恢复原始 bundle）。
 
 ## ⚙️ 兼容性
 

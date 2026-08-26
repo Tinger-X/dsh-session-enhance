@@ -12,6 +12,7 @@ const required = [
   "cordis.patch.yml",
   "lib/workspace.js",
   "lib/projcache.js",
+  "lib/message-edit.js",
   "lib/session-move.js",
   "lib/client.js",
   "LICENSE",

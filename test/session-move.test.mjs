@@ -282,3 +282,26 @@ test("physicallyMoveSession: persistence without raw artifacts refuses loudly", 
 		await rm(root, { recursive: true, force: true });
 	}
 });
+
+test("physicallyMoveSession: removes opposite-encoding artifacts carried into the moved directory", async () => {
+	const root = await mkdtemp(join(tmpdir(), "sm-move-"));
+	try {
+		const persistence = makePersistence(root);
+		const oldDir = join(root, projectKey(OLD_CWD), SID);
+		await writeArtifact(persistence, oldDir, SAMPLE_TEXT(OLD_CWD));
+		// 模拟共享会话根下另一编码实例遗留的明文工件（zstd 后端的相反编码）。
+		const foreign = join(oldDir, "session.jsonl");
+		await writeFile(foreign, SAMPLE_TEXT(OLD_CWD));
+		const outcome = await physicallyMoveSession(persistence, SID, header(OLD_CWD), NEW_CWD, quietLogger());
+		assert.equal(outcome.moved, true);
+		const newDir = join(root, projectKey(NEW_CWD), SID);
+		assert.equal(existsSync(newDir), true, "new transcript dir exists");
+		assert.equal(existsSync(join(newDir, "session.jsonl")), false, "opposite-encoding artifact removed after the move");
+		assert.equal(existsSync(join(newDir, persistence.artifactName)), true, "canonical artifact preserved");
+		const raw = await persistence.readRaw(SID);
+		assert.equal(raw.header.cwd, NEW_CWD, "artifact header cwd rewritten");
+		await assertStrictlyReadable(join(newDir, persistence.artifactName));
+	} finally {
+		await rm(root, { recursive: true, force: true });
+	}
+});
