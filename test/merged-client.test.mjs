@@ -57,6 +57,8 @@ test("merged client bundle registers one factory and applies both halves", async
 	assert.ok(registration.factory.toString().includes('id: "conversation-enhance"'));
 	assert.ok(registration.factory.toString().includes('"settings.manageTitle": "对话增强"'));
 	assert.ok(registration.factory.toString().includes('"settings.basicTab": "基础设置"'));
+	// 对话通知词条随 bundle 内联。
+	assert.ok(registration.factory.toString().includes('"notify.finished": "对话已结束。"'));
 
 	const registeredSlots = [];
 	const ctx = {

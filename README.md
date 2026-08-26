@@ -21,6 +21,7 @@ A community plugin, derived from [@michengai/dsh-archive-manager](https://github
 | ✏️ | **Message editing** | From the conversation **Timeline** view: edit any user/assistant text block, retry a turn, or reroll the last assistant reply — every operation forks a **reversible version branch** (truncate or preserve downstream turns), with full version-tree navigation and undo/redo. |
 | 📋 | **Copy session ID** | One click on **Copy ID** in the sidebar session menu puts the conversation's session id on your clipboard — handy for sharing, debugging, and reconciling transcript directories. |
 | ⚙️ | **Settings upgrade** | The Settings entry is now **对话增强** (Conversation Enhance) with two tabs: **基础设置** — set the `.dsh` home directory (default `~/.dsh`) and toggle **对话通知** (conversation notifications, default on) — and **归档管理** (the existing archive manager). |
+| 🔔 | **Conversation notifications** | When a background conversation finishes or needs your action (approval / question / plan review) and you are not focused on it, a simple system notification pops up — gated by the **对话通知** toggle in 基础设置. |
 
 ## 📸 Screenshots
 
