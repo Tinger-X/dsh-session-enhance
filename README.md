@@ -20,6 +20,16 @@ A community plugin, derived from [@michengai/dsh-archive-manager](https://github
 | 🔄 | **Record sync** | One click reconciles `~/storages/*.json` against the physical session files: ghosts are purged, misattributed sessions are corrected, missing accounting is restored. Immune to manual file edits or deletions. |
 | ✏️ | **Message editing** | From the conversation **Timeline** view: edit any user/assistant text block, retry a turn, or reroll the last assistant reply — every operation forks a **reversible version branch** (truncate or preserve downstream turns), with full version-tree navigation and undo/redo. |
 
+## 📸 Screenshots
+
+![Manage archived sessions in Settings](assets/screenshots/archived-sessions.png)
+
+Manage archived sessions in **Settings → 归档管理**: search, sort, filter by workspace, **同步记录** (sync records), restore and delete.
+
+![Archive a session from the sidebar menu](assets/screenshots/archive-session-menu.png)
+
+Archive any session straight from the sidebar session menu.
+
 ## 🧩 Why not the stock archive manager?
 
 | Capability | Stock DSH / basic archive plugins | **dsh-session-enhance** |
