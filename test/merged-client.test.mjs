@@ -53,6 +53,10 @@ test("merged client bundle registers one factory and applies both halves", async
 	assert.ok(registration.factory.toString().includes("会话不存在或已被删除。"));
 	// 会话菜单的复制ID 词条随 bundle 内联。
 	assert.ok(registration.factory.toString().includes('"menu.copySessionId": "复制ID"'));
+	// 设置分区升级为「对话增强」二级菜单（基础设置 / 归档管理）随 bundle 内联。
+	assert.ok(registration.factory.toString().includes('id: "conversation-enhance"'));
+	assert.ok(registration.factory.toString().includes('"settings.manageTitle": "对话增强"'));
+	assert.ok(registration.factory.toString().includes('"settings.basicTab": "基础设置"'));
 
 	const registeredSlots = [];
 	const ctx = {

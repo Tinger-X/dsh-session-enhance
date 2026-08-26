@@ -14,18 +14,19 @@ A community plugin, derived from [@michengai/dsh-archive-manager](https://github
 
 | | Feature | What you get |
 |---|---|---|
-| 🗂️ | **Archive management** | Archive from the sidebar session menu; manage everything in **Settings → 归档管理**: search, sort by time/title, filter by workspace, unarchive, restore per project / all, batch delete with confirmation. |
+| 🗂️ | **Archive management** | Archive from the sidebar session menu; manage everything in **Settings → 对话增强 → 归档管理**: search, sort by time/title, filter by workspace, unarchive, restore per project / all, batch delete with confirmation. |
 | 🗑️ | **True physical deletion** | Deletes the actual transcript directory (with retry against Windows handle delays), cascades SUBAGENT children, cleans spill, **and directly sweeps `~/storages/*.json`** so no ghost record survives — then *verifies* the disk and warns about leftovers. |
 | 🖱️ | **Drag & drop reassignment** | Drag a session onto another workspace group (or *ungrouped*) in the sidebar. The **transcript files physically move** to the target workspace's session directory, and the artifact header's `cwd` is rewritten — accounting-only moves that silently drop sessions from the sidebar are impossible. |
 | 🔄 | **Record sync** | One click reconciles `~/storages/*.json` against the physical session files: ghosts are purged, misattributed sessions are corrected, missing accounting is restored. Immune to manual file edits or deletions. |
 | ✏️ | **Message editing** | From the conversation **Timeline** view: edit any user/assistant text block, retry a turn, or reroll the last assistant reply — every operation forks a **reversible version branch** (truncate or preserve downstream turns), with full version-tree navigation and undo/redo. |
 | 📋 | **Copy session ID** | One click on **Copy ID** in the sidebar session menu puts the conversation's session id on your clipboard — handy for sharing, debugging, and reconciling transcript directories. |
+| ⚙️ | **Settings upgrade** | The Settings entry is now **对话增强** (Conversation Enhance) with two tabs: **基础设置** — set the `.dsh` home directory (default `~/.dsh`) and toggle **对话通知** (conversation notifications, default on) — and **归档管理** (the existing archive manager). |
 
 ## 📸 Screenshots
 
 ![Manage archived sessions in Settings](assets/screenshots/archived-sessions.png)
 
-Manage archived sessions in **Settings → 归档管理**: search, sort, filter by workspace, **同步记录** (sync records), restore and delete.
+Manage archived sessions in **Settings → 对话增强 → 归档管理**: search, sort, filter by workspace, **同步记录** (sync records), restore and delete.
 
 ![Archive a session from the sidebar menu](assets/screenshots/archive-session-menu.png)
 
@@ -35,7 +36,7 @@ Archive any session straight from the sidebar session menu.
 
 ![Manage archived sessions in Settings](assets/screenshots/archived-sessions.png)
 
-Manage archived sessions in **Settings → 归档管理**: search, sort, filter by workspace, **同步记录** (sync records), restore and delete.
+Manage archived sessions in **Settings → 对话增强 → 归档管理**: search, sort, filter by workspace, **同步记录** (sync records), restore and delete.
 
 ![Archive a session from the sidebar menu](assets/screenshots/archive-session-menu.png)
 
@@ -93,7 +94,7 @@ dsh --profile web --dump-config
 > **Verify** — `--dump-config` should list four service rows:
 > `workspace-dsh-session-enhance`, `session-projection-cache-dsh-session-enhance`, `message-edit-dsh-session-enhance`, `ui-workspace-dsh-session-enhance`
 
-Restart DSH Web and hard-refresh the browser (Ctrl+F5). The **归档管理** entry appears in Settings, right after **Connectors**, with a dedicated archive-box icon; the **Timeline** tab appears in every conversation, right after **Trajectory**.
+Restart DSH Web and hard-refresh the browser (Ctrl+F5). The **对话增强** entry appears in Settings, right after **Connectors**, with a dedicated archive-box icon; it holds the **基础设置** (`.dsh` home + notification toggle) and **归档管理** tabs. The **Timeline** tab appears in every conversation, right after **Trajectory**.
 
 ### ⚠️ Registry notes for source installs
 
@@ -104,7 +105,7 @@ Why? Range resolution can pull newer release candidates whose transitive depende
 ## 🎮 Usage
 
 1. **Archive** — sidebar session menu → *Archive session*.
-2. **Manage** — Settings → **归档管理**: search, sort (updated / created / alphabetical), filter by project, restore, delete (always confirmed).
+2. **Manage** — Settings → **对话增强 → 归档管理**: search, sort (updated / created / alphabetical), filter by project, restore, delete (always confirmed).
 3. **Sync records** — hit **同步记录** after manually touching files or `storages/*.json`: ghosts are purged, wrong workspace memberships are fixed, missing accounting is restored, and the header index is rebuilt. A summary toast reports `scanned / added / removed`.
 4. **Move by drag & drop** — drag a session row onto another workspace group header (or a session row inside another group), or onto **未分组** to detach it from all workspaces:
    - The transcript directory is physically relocated and the artifact header's `cwd` is rewritten; the change lands in `~/storages/workspace.json`.
@@ -122,7 +123,8 @@ Why? Range resolution can pull newer release candidates whose transitive depende
    - **Retry** — re-run a turn with its original user input.
    - **Reroll** — regenerate the newest assistant reply (truncate).
    - Every operation opens a **version branch**; the Timeline lists all versions with parent links, an undo stack, and redo targets. Deleting a derived branch (via this plugin's delete) never breaks the parent's timeline.
-7. **Copy session ID** — sidebar session menu → *Copy ID*: copies the conversation's session id to the clipboard (also available on archived sessions).
+7. **Basic settings** — Settings → **对话增强 → 基础设置**: set the `.dsh` home directory (the plugin locates `storages` from it; default `~/.dsh`) and toggle **对话通知** (conversation notifications, default on). When enabled, finishing or needing-action conversations pop a system notification while you are not focused on them.
+8. **Copy session ID** — sidebar session menu → *Copy ID*: copies the conversation's session id to the clipboard (also available on archived sessions).
 
 ## 🏗 Architecture
 
@@ -140,9 +142,10 @@ lib/session-move.js   Physical move core: transcript relocation + zstd-aware
 lib/storage-sweep.js  Direct disk sweep of ~/storages/*.json (recursive trace
                       removal, atomic writes, no-op when unchanged)
 lib/tombstone.js      Shared FIFO tombstone bookkeeping
-lib/client.js         Merged browser bundle: sidebar menu, 归档管理 settings
-                      page, drag & drop, nav icon, message-edit Timeline view
-                      and conversation-header controls (one loader module)
+lib/client.js         Merged browser bundle: sidebar menu, 对话增强 settings
+                      page (基础设置 + 归档管理), drag & drop, nav icon,
+                      message-edit Timeline view and conversation-header
+                      controls (one loader module)
 ```
 
 ### HTTP route
@@ -164,6 +167,7 @@ lib/client.js         Merged browser bundle: sidebar menu, 归档管理 settings
 | `syncRecords()` | reconcile storages against physical session files |
 | `verifyDeleted(sessionId)` | post-delete diagnostics (transcript + storage traces) |
 | `archivedSessionMetadata()` | creation-time metadata for the settings page |
+| `getSettings()` / `setSettings(settings)` | read / write 基础设置 (`homeDir`, `notifyEnabled`) persisted to `~/.dsh/session-enhance-settings.json` |
 
 ## 🛡 Data safety & integrity
 
