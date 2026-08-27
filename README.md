@@ -95,7 +95,7 @@ dsh --profile web --dump-config
 > **Verify** — `--dump-config` should list four service rows:
 > `workspace-dsh-session-enhance`, `session-projection-cache-dsh-session-enhance`, `message-edit-dsh-session-enhance`, `ui-workspace-dsh-session-enhance`
 
-Restart DSH Web and hard-refresh the browser (Ctrl+F5). The **对话增强** entry appears in Settings, right after **Connectors**, with a dedicated archive-box icon; it holds the **基础设置** (`.dsh` home + notification toggle) and **归档管理** tabs. The **Timeline** tab appears in every conversation, right after **Trajectory**.
+Restart DSH Web and hard-refresh the browser (Ctrl+F5). The **对话增强** entry appears in Settings, right after **Connectors**, with a dedicated sparkle icon; it holds the **基础设置** (`.dsh` home + notification toggle) and **归档管理** tabs. The **Timeline** tab appears in every conversation, right after **Trajectory**.
 
 ### ⚠️ Registry notes for source installs
 
@@ -216,7 +216,7 @@ It is flushed and detached first (like deletion), then physically moved; the con
 Yes — drag it back. Moves are not transactional with the registry by design, but they are idempotent and safe to retry.
 
 **The gear icon next to my section in Settings?**
-The settings shell maps nav icons by section id and falls back to a gear for unknown ids; this plugin swaps in a proper archive-box glyph at runtime.
+The settings shell maps nav icons by section id and falls back to a gear for unknown ids; this plugin swaps in a proper sparkle glyph at runtime.
 
 ## 📄 License
 
