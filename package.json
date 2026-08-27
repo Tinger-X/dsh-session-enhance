@@ -24,7 +24,8 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "node scripts/check-package.mjs",
+    "build": "node scripts/build-client.mjs && node scripts/check-package.mjs",
+    "build:client": "node scripts/build-client.mjs",
     "test": "node --test scripts/*.test.mjs",
     "pack:check": "pnpm pack --dry-run",
     "prepublishOnly": "pnpm build && pnpm test"
@@ -55,7 +56,8 @@
     "@deepseek-ai/dsh-session-projection-cache": "0.1.1-rc.2",
     "@deepseek-ai/dsh-spill-local": "0.1.1-rc.2",
     "@deepseek-ai/dsh-typert-protocol": "0.1.1-rc.2",
-    "@deepseek-ai/dsh-workspace": "0.1.1-rc.2"
+    "@deepseek-ai/dsh-workspace": "0.1.1-rc.2",
+    "esbuild": "^0.28.2"
   },
   "license": "Apache-2.0",
   "repository": {
