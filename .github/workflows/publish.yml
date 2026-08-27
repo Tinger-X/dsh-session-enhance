@@ -1,17 +1,20 @@
 name: publish
 
 # 打 v* 标签（如 v0.1.1）时自动构建、测试并发布到 npm。
-# 首次使用前：Settings → Secrets and variables → Actions → New repository secret
-#   Name: NPM_TOKEN
-#   Value: 在 npmjs.org 生成的 Automation access token（账号 → Access tokens）
+# 使用 NPM OIDC Trusted Publishing，不再需要 NPM_TOKEN secret
 on:
   push:
     tags:
       - "v*"
 
+
 jobs:
   publish:
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write   # 关键：允许 Actions 获取 OIDC token 对接npm
+      contents: read
+
     steps:
       - uses: actions/checkout@v4
 
@@ -34,7 +37,6 @@ jobs:
       - name: Run tests
         run: pnpm test
 
-      - name: Publish to npm
+      - name: Publish to npm via OIDC
         run: pnpm publish --no-git-checks
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        # 👉 不再设置 NODE_AUTH_TOKEN！OIDC会自动完成认证
