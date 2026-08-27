@@ -95,7 +95,7 @@ dsh --profile web --dump-config
 > **验证**：`--dump-config` 应出现四行服务：
 > `workspace-dsh-session-enhance`、`session-projection-cache-dsh-session-enhance`、`message-edit-dsh-session-enhance`、`ui-workspace-dsh-session-enhance`
 
-重启 DSH Web 并强制刷新（Ctrl+F5）。设置中 **Connectors 之后**出现「对话增强」入口（专属归档盒图标），内含 **基础设置**（`.dsh` 家目录 + 对话通知开关）与 **归档管理** 两个页签；每个会话出现 **Timeline** 页签（紧随 **Trajectory** 之后）。
+重启 DSH Web 并强制刷新（Ctrl+F5）。设置中 **Connectors 之后**出现「对话增强」入口（专属星光图标），内含 **基础设置**（`.dsh` 家目录 + 对话通知开关）与 **归档管理** 两个页签；每个会话出现 **Timeline** 页签（紧随 **Trajectory** 之后）。
 
 ### ⚠️ 源码安装的 registry 说明
 
@@ -210,7 +210,7 @@ pnpm test     # node --test（storage-sweep + session-move + message-edit + merg
 可以——拖回去即可。移动与记账本就幂等，重试安全。
 
 **设置里我那个分区旁边是齿轮图标？**
-设置壳按 section id 映射导航图标，未知 id 回退齿轮；本插件运行时替换为归档盒图标。
+设置壳按 section id 映射导航图标，未知 id 回退齿轮；本插件运行时替换为星光图标。
 
 ## 📄 License
 
