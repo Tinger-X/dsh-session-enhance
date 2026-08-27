@@ -5,8 +5,9 @@ import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promis
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { promisify } from "node:util";
-import { constants, zstdCompress, zstdDecompress } from "node:zlib";
+import { zstdCompress, zstdDecompress } from "node:zlib";
 import { physicallyMoveSession } from "../lib/session-move.js";
+import { CHECKSUM_OPTIONS, ZSTD_MAGIC } from "../lib/shared/constants.js";
 
 const SID = "session-0db89bc7-c887-4eb8-b974-aab495c5c152";
 const OLD_CWD = "D:/proj/alpha";
@@ -14,8 +15,6 @@ const NEW_CWD = "D:/proj/beta";
 
 const zstdCompressAsync = promisify(zstdCompress);
 const zstdDecompressAsync = promisify(zstdDecompress);
-const CHECKSUM_OPTIONS = { params: { [constants.ZSTD_c_checksumFlag]: 1 } };
-const ZSTD_MAGIC = 4247762216;
 
 function quietLogger() {
 	return { warn() {}, info() {} };
