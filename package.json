@@ -1,7 +1,7 @@
 {
   "name": "dsh-session-enhance",
   "version": "0.2.5",
-  "description": "DSH Web plugin for managing sessions: archive/unarchive, guaranteed physical deletion (transcript files + ~/storages/*.json sweep), drag-and-drop workspace reassignment, and branch-based message editing (edit/retry/reroll with reversible version timelines).",
+  "description": "DSH Web plugin for managing sessions: archive/unarchive, guaranteed physical deletion (transcript files + ~/storages/*.json sweep), and drag-and-drop workspace reassignment.",
   "type": "module",
   "packageManager": "pnpm@11.24.0",
   "engines": {
@@ -12,7 +12,6 @@
     ".": "./lib/index.js",
     "./workspace": "./lib/workspace.js",
     "./projcache": "./lib/projcache.js",
-    "./message-edit": "./lib/message-edit.js",
     "./client": "./lib/client.js",
     "./package.json": "./package.json"
   },
@@ -95,10 +94,6 @@
     "session-enhance",
     "physical-delete",
     "drag-drop",
-    "message-edit",
-    "reroll",
-    "retry",
-    "timeline",
     "cordis",
     "typert",
     "workspace",
