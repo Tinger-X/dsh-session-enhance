@@ -26,7 +26,7 @@
   ],
   "scripts": {
     "build": "node scripts/check-package.mjs",
-    "test": "node --test test/*.test.mjs",
+    "test": "node --test scripts/*.test.mjs",
     "pack:check": "pnpm pack --dry-run",
     "prepublishOnly": "pnpm build && pnpm test"
   },
