@@ -34,11 +34,25 @@ DeepSeek Harness Web 在**两处**维护你的会话列表：侧栏读 `~/storag
 
 ## 📸 效果截图
 
-![归档管理设置页](assets/screenshots/archived-sessions.png)
+![设置](img\session-enhance-settings.png)
+
+在 **设置 → 对话增强 → 基础设置** 的一些设置。
+
+![归档管理](img\session-archive-manage.png)
 
 在 **设置 → 对话增强 → 归档管理** 管理已归档会话：搜索、排序、按工作区筛选、**同步记录**、恢复与删除。
 
-![侧栏会话菜单归档](assets/screenshots/archive-session-menu.png)
+![会话菜单](img\session-menu.png)
+
+侧栏中的会话菜单。
+
+![对话结束通知](img\session-end-notice.png)
+
+当你不在对话界面时，会话结束通知。
+
+![会话操作通知](img\session-operation-notice.png)
+
+当你不在对话界面时，会话操作通知。
 
 侧栏会话菜单一键归档。
 
@@ -68,8 +82,10 @@ dsh --profile web --dump-config
 - **归档** — 侧栏会话菜单 → *Archive session*。
 - **管理** — 设置 → 对话增强 → 归档管理：搜索、排序、筛选、恢复、批量删除。
 - **同步** — 手动动过文件或 `storages/*.json` 后点 **同步记录**。
-- **移动** — 把会话行拖到另一个工作区分组，或拖到 **未分组** 解除归属。
+- **移动** — 把会话行拖到另一个工作区分组。
 - **删除** — 单条 / 按项目 / 全部，一律确认。
+- **复制** — 侧栏菜单一键复制。
+- **通知** — 后台对话结束或需要你操作时弹出系统提示。
 
 ## 📄 License
 

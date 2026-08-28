@@ -34,13 +34,25 @@ DeepSeek Harness Web keeps your session list in two places: the sidebar reads `~
 
 ## 📸 Screenshots
 
-![Manage archived sessions](assets/screenshots/archived-sessions.png)
+![Session enhance settings](img\session-enhance-settings.png)
+
+Some settings in **设置 → 对话增强 → 基础设置**.
+
+![Manage archived sessions](img\session-archive-manage.png)
 
 Manage archived sessions in **设置 → 对话增强 → 归档管理**: search, sort, filter by workspace, **同步记录**, restore and delete.
 
-![Archive from the sidebar menu](assets/screenshots/archive-session-menu.png)
+![Sidebar menu](img\session-menu.png)
 
-Archive any session straight from the sidebar session menu.
+Menu items in the session sidebar.
+
+![Session end notice](img\session-end-notice.png)
+
+Conversation end notice while you're not focused on the conversation.
+
+![Session operation notice](img\session-operation-notice.png)
+
+Conversation operation notice while you're not focused on the conversation.
 
 ## 🚀 Install
 
@@ -68,8 +80,10 @@ Restart DSH Web and hard-refresh (Ctrl+F5). **对话增强** appears in Settings
 - **Archive** — sidebar session menu → *Archive session*.
 - **Manage** — 设置 → 对话增强 → 归档管理: search, sort, filter, restore, batch delete.
 - **Sync** — hit **同步记录** after touching files or `storages/*.json`.
-- **Move** — drag a session row onto another workspace group, or onto **未分组** to detach it.
+- **Move** — drag a session row onto another workspace group.
 - **Delete** — per-session / per-project / all, always confirmed.
+- **Copy** — one click in the sidebar menu.
+- **Notify** — launch a session and go away.
 
 ## 📄 License
 
