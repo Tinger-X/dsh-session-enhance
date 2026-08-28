@@ -34,27 +34,25 @@ DeepSeek Harness Web 在**两处**维护你的会话列表：侧栏读 `~/storag
 
 ## 📸 效果截图
 
-![设置](img\session-enhance-settings.png)
+![设置](img/session-enhance-settings.png)
 
 在 **设置 → 对话增强 → 基础设置** 的一些设置。
 
-![归档管理](img\session-archive-manage.png)
+![归档管理](img/session-archive-manage.png)
 
 在 **设置 → 对话增强 → 归档管理** 管理已归档会话：搜索、排序、按工作区筛选、**同步记录**、恢复与删除。
 
-![会话菜单](img\session-menu.png)
+![会话菜单](img/session-menu.png)
 
 侧栏中的会话菜单。
 
-![对话结束通知](img\session-end-notice.png)
+![对话结束通知](img/session-end-notice.png)
 
 当你不在对话界面时，会话结束通知。
 
-![会话操作通知](img\session-operation-notice.png)
+![会话操作通知](img/session-operate-notice.png)
 
 当你不在对话界面时，会话操作通知。
-
-侧栏会话菜单一键归档。
 
 ## 🚀 安装
 
