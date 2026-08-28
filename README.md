@@ -34,7 +34,7 @@ DeepSeek Harness Web keeps your session list in two places: the sidebar reads `~
 
 ## 📸 Screenshots
 
-![Session enhance settings](img/session-enhance-settings.png)
+![Session enhance settings](img/session-settings.png)
 
 Some settings in **设置 → 对话增强 → 基础设置**.
 

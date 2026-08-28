@@ -34,7 +34,7 @@ DeepSeek Harness Web 在**两处**维护你的会话列表：侧栏读 `~/storag
 
 ## 📸 效果截图
 
-![设置](img/session-enhance-settings.png)
+![设置](img/session-settings.png)
 
 在 **设置 → 对话增强 → 基础设置** 的一些设置。
 
