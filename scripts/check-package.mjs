@@ -1,5 +1,6 @@
 // 轻量发布预检：校验 DSH 加载器与 npm 包依赖的单包结构。
-// 该纯 ESM 插件无需额外构建，此脚本同时作为 `pnpm build` 的校验入口。
+// 宿主侧（lib/*）为纯 ESM 无需构建；客户端（lib/client.js）由
+// scripts/build-client.mjs 从 src/client 生成，`pnpm build` 会先构建再校验。
 import { access } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -12,7 +13,6 @@ const required = [
   "cordis.patch.yml",
   "lib/workspace.js",
   "lib/projcache.js",
-  "lib/message-edit.js",
   "lib/session-move.js",
   "lib/settings.js",
   "lib/client.js",

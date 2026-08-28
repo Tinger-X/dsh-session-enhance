@@ -1,6 +1,6 @@
 # ⚡ DSH Session Enhance
 
-**带「回执」的会话管理。在 DeepSeek Harness Web 里归档、物理删除、跨工作区拖拽会话，并在可逆版本分支上回滚对话历史。每一步都真实落盘，侧栏永远与磁盘一致。**
+**带「回执」的会话管理。在 DeepSeek Harness Web 里归档、物理删除、跨工作区拖拽会话。每一步都真实落盘，侧栏永远与磁盘一致。**
 
 ![License](https://img.shields.io/badge/license-Apache--2.0-blue) ![DSH](https://img.shields.io/badge/DSH-0.1.1--rc.2-green) ![Node](https://img.shields.io/badge/node-%5E22.19%20%7C%7C%20%3E%3D24-339933) ![Type](https://img.shields.io/badge/type-ESM-4B32C3)
 
@@ -28,18 +28,31 @@ DeepSeek Harness Web 在**两处**维护你的会话列表：侧栏读 `~/storag
 ## ✨ 更多能力
 
 - 🗂️ **归档管理** — 侧栏菜单一键归档；**设置 → 对话增强 → 归档管理** 里搜索、排序、筛选、恢复、批量删除。
-- ✏️ **消息编辑** — **Timeline** 视图编辑任意消息、重试某回合、重新生成最近回复；每次操作分叉为可逆版本分支，undo/redo 完整可用；删除派生分支不影响父会话。
 - 🔔 **对话通知** — 后台对话结束或需要你操作时弹出系统提示。
 - 📋 **复制会话 ID** — 侧栏菜单一键复制，已归档会话同样可用。
 - ⚙️ **对话增强设置** — **设置 → 对话增强 → 基础设置** 配置 `.dsh` 家目录与通知开关。
 
 ## 📸 效果截图
 
-![归档管理设置页](assets/screenshots/archived-sessions.png)
+![设置](img\session-enhance-settings.png)
+
+在 **设置 → 对话增强 → 基础设置** 的一些设置。
+
+![归档管理](img\session-archive-manage.png)
 
 在 **设置 → 对话增强 → 归档管理** 管理已归档会话：搜索、排序、按工作区筛选、**同步记录**、恢复与删除。
 
-![侧栏会话菜单归档](assets/screenshots/archive-session-menu.png)
+![会话菜单](img\session-menu.png)
+
+侧栏中的会话菜单。
+
+![对话结束通知](img\session-end-notice.png)
+
+当你不在对话界面时，会话结束通知。
+
+![会话操作通知](img\session-operation-notice.png)
+
+当你不在对话界面时，会话操作通知。
 
 侧栏会话菜单一键归档。
 
@@ -62,16 +75,17 @@ dsh plugin --profile web add .
 dsh --profile web --dump-config
 ```
 
-重启 DSH Web 并强制刷新（Ctrl+F5）。设置中 **Connectors 之后**出现「对话增强」入口，每个会话新增 **Timeline** 页签（紧随 **Trajectory** 之后）。
+重启 DSH Web 并强制刷新（Ctrl+F5）。设置中 **Connectors 之后**出现「对话增强」入口。
 
 ## 🎮 快速上手
 
 - **归档** — 侧栏会话菜单 → *Archive session*。
 - **管理** — 设置 → 对话增强 → 归档管理：搜索、排序、筛选、恢复、批量删除。
 - **同步** — 手动动过文件或 `storages/*.json` 后点 **同步记录**。
-- **移动** — 把会话行拖到另一个工作区分组，或拖到 **未分组** 解除归属。
+- **移动** — 把会话行拖到另一个工作区分组。
 - **删除** — 单条 / 按项目 / 全部，一律确认。
-- **编辑** — 打开会话切到 **Timeline**：编辑 / 重试 / 重新生成，每次都是可逆版本分支。
+- **复制** — 侧栏菜单一键复制。
+- **通知** — 后台对话结束或需要你操作时弹出系统提示。
 
 ## 📄 License
 

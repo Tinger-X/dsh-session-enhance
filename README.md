@@ -1,6 +1,6 @@
 # ⚡ DSH Session Enhance
 
-**Session management with receipts. Archive, physically delete, and drag sessions between workspaces in DeepSeek Harness Web — then edit conversation history on reversible version branches. Every action touches real files, and the sidebar always tells the truth.**
+**Session management with receipts. Archive, physically delete, and drag sessions between workspaces in DeepSeek Harness Web. Every action touches real files, and the sidebar always tells the truth.**
 
 ![License](https://img.shields.io/badge/license-Apache--2.0-blue) ![DSH](https://img.shields.io/badge/DSH-0.1.1--rc.2-green) ![Node](https://img.shields.io/badge/node-%5E22.19%20%7C%7C%20%3E%3D24-339933) ![Type](https://img.shields.io/badge/type-ESM-4B32C3)
 
@@ -28,20 +28,31 @@ DeepSeek Harness Web keeps your session list in two places: the sidebar reads `~
 ## ✨ On top of that
 
 - 🗂️ **Archive management** — archive from the sidebar menu; search, sort, filter, restore and batch-delete in **设置 → 对话增强 → 归档管理**.
-- ✏️ **Message editing** — from the **Timeline** view, edit any message, retry a turn, or reroll the last reply. Each operation forks a reversible version branch with undo/redo; deleting a branch never breaks the parent.
 - 🔔 **Conversation notifications** — a background conversation finishing or needing your input pops a system notification while you're elsewhere.
 - 📋 **Copy session ID** — one click in the sidebar menu, also on archived sessions.
 - ⚙️ **Conversation Enhance settings** — `.dsh` home directory and the notification toggle, in **设置 → 对话增强 → 基础设置**.
 
 ## 📸 Screenshots
 
-![Manage archived sessions](assets/screenshots/archived-sessions.png)
+![Session enhance settings](img\session-enhance-settings.png)
+
+Some settings in **设置 → 对话增强 → 基础设置**.
+
+![Manage archived sessions](img\session-archive-manage.png)
 
 Manage archived sessions in **设置 → 对话增强 → 归档管理**: search, sort, filter by workspace, **同步记录**, restore and delete.
 
-![Archive from the sidebar menu](assets/screenshots/archive-session-menu.png)
+![Sidebar menu](img\session-menu.png)
 
-Archive any session straight from the sidebar session menu.
+Menu items in the session sidebar.
+
+![Session end notice](img\session-end-notice.png)
+
+Conversation end notice while you're not focused on the conversation.
+
+![Session operation notice](img\session-operation-notice.png)
+
+Conversation operation notice while you're not focused on the conversation.
 
 ## 🚀 Install
 
@@ -62,16 +73,17 @@ dsh plugin --profile web add .
 dsh --profile web --dump-config
 ```
 
-Restart DSH Web and hard-refresh (Ctrl+F5). **对话增强** appears in Settings right after **Connectors**; every conversation gains a **Timeline** tab after **Trajectory**.
+Restart DSH Web and hard-refresh (Ctrl+F5). **对话增强** appears in Settings right after **Connectors**.
 
 ## 🎮 Quick start
 
 - **Archive** — sidebar session menu → *Archive session*.
 - **Manage** — 设置 → 对话增强 → 归档管理: search, sort, filter, restore, batch delete.
 - **Sync** — hit **同步记录** after touching files or `storages/*.json`.
-- **Move** — drag a session row onto another workspace group, or onto **未分组** to detach it.
+- **Move** — drag a session row onto another workspace group.
 - **Delete** — per-session / per-project / all, always confirmed.
-- **Edit** — open a conversation, switch to **Timeline**: edit / retry / reroll, each a reversible branch.
+- **Copy** — one click in the sidebar menu.
+- **Notify** — launch a session and go away.
 
 ## 📄 License
 
