@@ -5,6 +5,30 @@ import { formatDeleteError, formatUnarchiveError } from "./derive.js";
 import { displayTitle, archiveTimeLabel } from "./rows.js";
 import { zh, en } from "./locales.js";
 
+/** 与后端一致的 projectKey：路径分隔符/冒号 → `-`，整体包 `--...--`（把工作区 cwd 映射回会话目录名）。 */
+function projectKey(cwd) {
+	if (!cwd) return "_no-cwd";
+	let readable = "";
+	let separatorRun = false;
+	for (const ch of cwd) {
+		if (ch === "/" || ch === "\\" || ch === ":") {
+			if (!separatorRun) readable += "-";
+			separatorRun = true;
+		} else {
+			readable += ch;
+			separatorRun = false;
+		}
+	}
+	return `--${(readable.replace(/^-+/, "") || "root").slice(0, 251)}--`;
+}
+/** 空目录名回退显示：去掉 `--...--` 包裹后取最后一级路径（如 `--D-tmp--` → `tmp`）。 */
+function emptyDirLabel(name) {
+	if (typeof name !== "string") return name;
+	const core = name.replace(/^--/, "").replace(/--$/, "");
+	const last = core.split("-").filter(Boolean).pop();
+	return last || name;
+}
+
 const ARCHIVE_SETTINGS_CSS = ".dshse_settings{box-sizing:border-box;width:min(100%,760px);margin:0 auto;padding:0 0 32px;color:var(--dsw-alias-label-primary)}.dshse_settingsHeader{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:12px}.dshse_settings h2{margin:0;font-size:20px;font-weight:650;letter-spacing:-.2px;line-height:28px}.dshse_settingsIntro{margin:4px 0 0;max-width:42em;color:var(--dsw-alias-label-tertiary);font-size:13px;line-height:1.5}.dshse_settingsDanger{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:0 12px;color:var(--dsw-alias-state-error-primary);background:transparent;border:1px solid var(--dsw-alias-state-error-primary);border-radius:8px;cursor:pointer;font:inherit;font-size:13px;font-weight:500}.dshse_settingsDanger:hover{background:color-mix(in srgb,var(--dsw-alias-state-error-primary) 20%,transparent)}.dshse_settingsToolbar{display:flex;gap:8px;margin-bottom:16px}.dshse_settingsSearch{display:flex;align-items:center;gap:8px;min-width:0;flex:1;height:32px;padding:0 12px;color:var(--dsw-alias-label-tertiary);background:var(--dsw-alias-bg-layer-3,var(--dsw-alias-button-elevated-fill));border:1px solid var(--dsw-alias-border-l2);border-radius:8px}.dshse_settingsSearch:focus-within{border-color:var(--dsw-alias-label-tertiary)}.dshse_settingsSearch input{width:100%;min-width:0;padding:0;color:var(--dsw-alias-label-primary);background:transparent;border:0;outline:0;font:inherit;font-size:12px}.dshse_settingsSearch input::placeholder{color:var(--dsw-alias-label-tertiary)}.dshse_settingsFilter{position:relative;min-width:168px;flex:none}.dshse_selectTrigger{box-sizing:border-box;display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;min-height:32px;padding:0 10px;color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-layer-3,var(--dsw-alias-button-elevated-fill));border:1px solid var(--dsw-alias-border-l2);border-radius:8px;cursor:pointer;font:inherit;font-size:13px;line-height:20px;text-align:left}.dshse_selectTrigger:hover{background:var(--dsw-alias-interactive-bg-hover)}.dshse_selectTrigger:focus-visible{outline:2px solid var(--dsw-alias-state-business-primary);outline-offset:2px}.dshse_selectTrigger[aria-expanded='true']{border-color:var(--dsw-alias-label-primary)}.dshse_selectValue{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dshse_selectCaret{flex:none;width:12px;height:12px;color:var(--dsw-alias-label-tertiary)}.dshse_selectMenu{position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:30;box-sizing:border-box;min-width:100%;max-height:280px;overflow:auto;padding:4px;border:1px solid var(--dsw-alias-border-l2);border-radius:10px;background:var(--dsw-specific-menu,var(--dsw-alias-bg-layer-2));box-shadow:var(--dsw-shadow-lv3)}.dshse_selectOption{box-sizing:border-box;display:flex;align-items:center;width:100%;min-height:32px;padding:0 10px;border:0;border-radius:8px;background:transparent;color:var(--dsw-alias-label-primary);font:inherit;font-size:13px;line-height:20px;text-align:left;cursor:pointer}.dshse_selectOption:hover,.dshse_selectOption[data-active='true']{background:var(--dsw-alias-interactive-bg-hover)}.dshse_selectOption[aria-selected='true']{color:var(--dsw-alias-label-primary)}.dshse_settingsGroup{margin:0 0 20px}.dshse_settingsGroupHeading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 14px}.dshse_settingsGroupTitle{display:flex;align-items:center;gap:8px;min-width:0;margin:0;color:var(--dsw-alias-label-primary);font-size:13px;font-weight:600}.dshse_settingsGroupTitle svg{flex:none;color:var(--dsw-alias-label-secondary)}.dshse_settingsCount{flex:none;color:var(--dsw-alias-label-tertiary);font-size:12px}.dshse_settingsList{overflow:hidden;border:1px solid var(--dsw-alias-border-l2);border-radius:12px;background:var(--dsw-alias-bg-layer-2,var(--dsw-alias-button-elevated-fill))}.dshse_settingsRow{display:flex;align-items:center;gap:12px;min-height:60px;padding:10px 16px;border-bottom:1px solid var(--dsw-alias-border-l2)}.dshse_settingsRow:last-child{border-bottom:0}.dshse_settingsContent{min-width:0;flex:1}.dshse_settingsTitle{overflow:hidden;color:var(--dsw-alias-label-primary);font-size:13px;font-weight:600;line-height:18px;text-overflow:ellipsis;white-space:nowrap}.dshse_settingsMeta{margin-top:2px;color:var(--dsw-alias-label-tertiary);font-size:12px;line-height:16px}.dshse_settingsActions{display:flex;align-items:center;gap:8px}.dshse_settingsAction{min-height:32px;padding:0 12px;color:var(--dsw-alias-label-primary);background:transparent;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;cursor:pointer;font:inherit;font-size:13px;font-weight:500}.dshse_settingsAction:hover{filter:brightness(1.12)}.dshse_settingsDelete{display:flex;align-items:center;justify-content:center;width:28px;height:28px;color:var(--dsw-alias-label-tertiary);background:transparent;border:0;border-radius:8px;cursor:pointer}.dshse_settingsDelete:hover{color:var(--dsw-alias-state-error-primary);background:var(--dsw-alias-interactive-bg-hover)}.dshse_settingsEmpty{padding:28px 8px;color:var(--dsw-alias-label-secondary);text-align:center}.dshse_settingsError{margin-top:10px;color:var(--dsw-alias-state-error-primary);font-size:12px}@media(max-width:720px){.dshse_settings{width:100%;margin:28px auto 48px;padding:0 16px}.dshse_settingsHeader{margin-bottom:28px}.dshse_settingsToolbar{flex-wrap:wrap;margin-bottom:28px}.dshse_settingsSearch{flex-basis:100%}.dshse_settingsFilter{flex:1;min-width:0}.dshse_settingsGroup{margin-bottom:32px}.dshse_settingsRow{padding:10px 12px}.dshse_settingsActions{gap:4px}}";
 const ARCHIVE_SETTINGS_BATCH_CSS = ".dshse_settingsHeaderActions,.dshse_settingsGroupMeta{display:flex;align-items:center;gap:8px;flex:none}.dshse_settingsRestoreAll{display:inline-flex;align-items:center;min-height:32px;padding:0 12px;color:var(--dsw-alias-label-primary);background:transparent;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;cursor:pointer;font:inherit;font-size:13px;font-weight:500}.dshse_settingsRestoreAll:hover{background:var(--dsw-alias-interactive-bg-hover)}.dshse_settingsRestoreAll:disabled,.dshse_settingsDanger:disabled,.dshse_settingsGroupMenu:disabled{cursor:not-allowed;opacity:.5}.dshse_settingsGroupMenu{display:flex;align-items:center;justify-content:center;width:28px;height:28px;padding:0;color:var(--dsw-alias-label-tertiary);background:transparent;border:0;border-radius:8px;cursor:pointer}.dshse_settingsGroupMenu:hover{color:var(--dsw-alias-label-primary);background:var(--dsw-alias-interactive-bg-hover)}.dshse_settingsStatus{margin-top:10px;color:var(--dsw-alias-label-secondary);font-size:12px}@media(max-width:720px){.dshse_settingsHeader{flex-direction:column}.dshse_settingsHeaderActions{align-self:flex-end}}";
 const ARCHIVE_SETTINGS_LAYOUT_OVERRIDE = ".dshse_settings{margin:0 auto!important}@media(max-width:720px){.dshse_settings{margin:0 auto!important}}";
@@ -183,7 +207,7 @@ function ArchiveProjectSelect({ id, value, options, onChange, "aria-label": aria
 	});
 }
 /** 项目标题右侧的批量恢复/删除菜单，复用宿主菜单组件的键盘和焦点行为。 */
-function ArchivedGroupActions({ group, busy, onRestore, onDelete, t }) {
+function ArchivedGroupActions({ group, busy, allArchived, onRestore, onDelete, onDeleteWorkspace, t }) {
 	const [open, setOpen] = (0, react.useState)(false);
 	const ungrouped = group.key === ARCHIVE_UNGROUPED_KEY;
 	const items = [{
@@ -195,6 +219,17 @@ function ArchivedGroupActions({ group, busy, onRestore, onDelete, t }) {
 		icon: (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconTrashOutline16, {}),
 		danger: true
 	}];
+	if (!ungrouped && allArchived) {
+		items.push({
+			type: "separator",
+			id: "delete-workspace-separator"
+		}, {
+			id: "deleteWorkspace",
+			label: t("delete.workspace"),
+			icon: (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconTrashOutline16, {}),
+			danger: true
+		});
+	}
 	return (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Menu, {
 		open,
 		onClose: () => setOpen(false),
@@ -203,6 +238,7 @@ function ArchivedGroupActions({ group, busy, onRestore, onDelete, t }) {
 			setOpen(false);
 			if (id === "restore") onRestore();
 			else if (id === "delete") onDelete();
+			else if (id === "deleteWorkspace") onDeleteWorkspace();
 		},
 		portal: true,
 		anchor: (0, react_jsx_runtime.jsx)("button", {
@@ -286,7 +322,7 @@ function sortArchivedGroups(groups, sortBy, createdAtById, t) {
 	});
 }
 /** 管理设置页中的归档会话，数据直接订阅 DSH 的会话与工作区投影。 */
-function ArchivedSessionsSection({ sessionStore, workspaceStore, unarchiveSession, deleteSession, unarchiveSessions, deleteArchivedSessions, archivedSessionMetadata, syncRecords, t }) {
+function ArchivedSessionsSection({ sessionStore, workspaceStore, unarchiveSession, deleteSession, deleteWorkspace, unarchiveSessions, deleteArchivedSessions, archivedSessionMetadata, syncRecords, listEmptyWorkspaceDirectories, deleteEmptyWorkspaceDirectory, t }) {
 	const sessions = (0, react.useSyncExternalStore)(sessionStore.subscribe, sessionStore.getSnapshot);
 	const workspaceState = (0, react.useSyncExternalStore)(workspaceStore.subscribe, workspaceStore.getSnapshot);
 	const [deleteTarget, setDeleteTarget] = (0, react.useState)(null);
@@ -297,6 +333,15 @@ function ArchivedSessionsSection({ sessionStore, workspaceStore, unarchiveSessio
 	const [project, setProject] = (0, react.useState)("all");
 	const [sortBy, setSortBy] = (0, react.useState)("updated");
 	const [createdAtById, setCreatedAtById] = (0, react.useState)({});
+	const [emptyDirs, setEmptyDirs] = (0, react.useState)([]);
+	const emptyDirsLoadingRef = (0, react.useRef)(false);
+	const archivedSet = (0, react.useMemo)(() => new Set(workspaceState.archivedSessionIds), [workspaceState.archivedSessionIds]);
+	// 空目录名（projectKey 编码，大小写不敏感）→ 工作区信息，用于显示重命名后的标题及删除时同步移除工作区记录。
+	const workspaceByDirName = (0, react.useMemo)(() => {
+		const map = new Map();
+		for (const item of workspaceState.items) map.set(projectKey(item.path).toLowerCase(), { workspaceId: item.workspaceId, title: item.title });
+		return map;
+	}, [workspaceState.items]);
 	const groups = (0, react.useMemo)(() => deriveArchivedGroups(sessions.byId, workspaceState.items, workspaceState.archivedSessionIds, t("group.ungrouped")), [sessions.byId, workspaceState, t]);
 	const sortedGroups = (0, react.useMemo)(() => sortArchivedGroups(groups, sortBy, createdAtById, t), [groups, sortBy, createdAtById, t]);
 	(0, react.useEffect)(() => {
@@ -311,6 +356,21 @@ function ArchivedSessionsSection({ sessionStore, workspaceStore, unarchiveSessio
 			cancelled = true;
 		};
 	}, [archivedSessionMetadata, workspaceState.archivedSessionIds]);
+	const refreshEmptyDirectories = (0, react.useCallback)(async () => {
+		if (emptyDirsLoadingRef.current) return;
+		emptyDirsLoadingRef.current = true;
+		try {
+			const result = await listEmptyWorkspaceDirectories();
+			setEmptyDirs(result.directories);
+		} catch (reason) {
+			console.warn("listEmptyWorkspaceDirectories failed:", reason);
+		} finally {
+			emptyDirsLoadingRef.current = false;
+		}
+	}, [listEmptyWorkspaceDirectories]);
+	(0, react.useEffect)(() => {
+		refreshEmptyDirectories();
+	}, [refreshEmptyDirectories]);
 	(0, react.useEffect)(() => {
 		// 选中的分组消失（如最后一个归档会话被取消归档）时回退到
 		// “所有项目”，避免筛选值停留在失效 key 上把列表过滤为空。
@@ -393,29 +453,60 @@ function ArchivedSessionsSection({ sessionStore, workspaceStore, unarchiveSessio
 				} else {
 					setNotice(t("archives.deleteSuccess", { n: completed }));
 				}
+				await refreshEmptyDirectories();
+			} else if (deleteTarget.kind === "workspace") {
+				// 归档管理中的「删除工作区」：先删除该工作区的全部归档对话，再移除工作区记录与空目录。
+				const result = await deleteArchivedSessions({ scope: "workspace", workspaceId: deleteTarget.workspaceId });
+				await deleteWorkspace(deleteTarget.workspaceId);
+				if (typeof deleteTarget.dirName === "string" && deleteTarget.dirName.length > 0) {
+					await deleteEmptyWorkspaceDirectory(deleteTarget.dirName);
+				}
+				if (result.failures.length > 0) {
+					const done = result.deletedSessionIds.length + result.skippedSessionIds.length;
+					setError(t("archives.deletePartial", { done, failed: result.failures.length, detail: result.failures[0].message }));
+				} else {
+					setNotice(t("archives.deleteWorkspaceDone", { name: deleteTarget.title }));
+				}
+				await refreshEmptyDirectories();
+			} else if (deleteTarget.kind === "workspaceDir") {
+				// 空工作区目录：若仍对应一个工作区记录，先移除记录以同步 sidebar，再删空目录。
+				if (typeof deleteTarget.workspaceId === "string" && deleteTarget.workspaceId.length > 0) {
+					await deleteWorkspace(deleteTarget.workspaceId);
+				}
+				await deleteEmptyWorkspaceDirectory(deleteTarget.name);
+				setNotice(t("archives.emptyDirDeleted", { name: deleteTarget.name }));
+				await refreshEmptyDirectories();
 			} else {
 				await deleteSession(deleteTarget.session.id);
+				await refreshEmptyDirectories();
 			}
 			setDeleteTarget(null);
 		} catch (reason) {
-			setError(formatDeleteError(reason, t));
+			const detail = reason instanceof Error ? reason.message : String(reason);
+			if (deleteTarget?.kind === "workspace") setError(t("archives.deleteWorkspaceFailed", { detail }));
+			else if (deleteTarget?.kind === "workspaceDir") setError(t("archives.emptyDirDeleteFailed", { detail }));
+			else setError(formatDeleteError(reason, t));
 		} finally {
 			setBusy(false);
 		}
 	};
+	const isWorkspaceDelete = deleteTarget?.kind === "workspace";
+	const isWorkspaceDirDelete = deleteTarget?.kind === "workspaceDir";
 	const batchScope = deleteTarget?.kind === "batch" ? deleteTarget.target.scope : null;
-	const deleteDialogTitle = batchScope === "all" ? t("archives.deleteAllTitle") : batchScope === "ungrouped" ? t("archives.deleteUngroupedTitle") : batchScope === "workspace" ? t("archives.deleteProjectTitle", { name: deleteTarget.title }) : t("deleteSession.title");
-	const deleteDialogDescription = deleteTarget === null ? void 0 : batchScope === "all" ? t("archives.deleteAllDesc", { n: deleteTarget.count }) : batchScope === "ungrouped" ? t("archives.deleteUngroupedDesc", { n: deleteTarget.count }) : batchScope === "workspace" ? t("archives.deleteProjectDesc", { name: deleteTarget.title, n: deleteTarget.count }) : t("deleteSession.desc", { name: displayTitle(deleteTarget.session, t) });
-	const deleteConfirmLabel = batchScope === "all" ? t("archives.deleteAll") : batchScope === "ungrouped" ? t("archives.deleteUngroupedConfirm") : batchScope === "workspace" ? t("archives.deleteProjectConfirm") : t("deleteSession.title");
+	const deleteDialogTitle = isWorkspaceDelete ? t("delete.workspace") : isWorkspaceDirDelete ? t("archives.emptyDirDeleteTitle") : batchScope === "all" ? t("archives.deleteAllTitle") : batchScope === "ungrouped" ? t("archives.deleteUngroupedTitle") : batchScope === "workspace" ? t("archives.deleteProjectTitle", { name: deleteTarget.title }) : t("deleteSession.title");
+	const deleteDialogDescription = deleteTarget === null ? void 0 : isWorkspaceDelete ? t("archives.deleteWorkspaceDesc", { name: deleteTarget.title }) : isWorkspaceDirDelete ? t("archives.emptyDirDeleteDesc", { name: deleteTarget.name }) : batchScope === "all" ? t("archives.deleteAllDesc", { n: deleteTarget.count }) : batchScope === "ungrouped" ? t("archives.deleteUngroupedDesc", { n: deleteTarget.count }) : batchScope === "workspace" ? t("archives.deleteProjectDesc", { name: deleteTarget.title, n: deleteTarget.count }) : t("deleteSession.desc", { name: displayTitle(deleteTarget.session, t) });
+	const deleteConfirmLabel = isWorkspaceDelete ? t("delete.workspace") : isWorkspaceDirDelete ? t("archives.emptyDirDeleteConfirm") : batchScope === "all" ? t("archives.deleteAll") : batchScope === "ungrouped" ? t("archives.deleteUngroupedConfirm") : batchScope === "workspace" ? t("archives.deleteProjectConfirm") : t("deleteSession.title");
 	return (0, react_jsx_runtime.jsxs)("section", {
 		className: "dshse_settings",
 		"aria-label": t("archives.title"),
-		children: [(0, react_jsx_runtime.jsx)("style", { children: ARCHIVE_SETTINGS_CSS + ARCHIVE_SETTINGS_BATCH_CSS }), (0, react_jsx_runtime.jsxs)("header", { className: "dshse_settingsHeader", children: [(0, react_jsx_runtime.jsxs)("div", { children: [(0, react_jsx_runtime.jsx)("h2", { children: t("archives.title") }), (0, react_jsx_runtime.jsx)("p", { className: "dshse_settingsIntro", children: t("archives.description") })] }), (0, react_jsx_runtime.jsxs)("div", { className: "dshse_settingsHeaderActions", children: [(0, react_jsx_runtime.jsx)("button", { type: "button", className: "dshse_settingsRestoreAll", disabled: busy, onClick: onSync, children: t("archives.sync") }), (0, react_jsx_runtime.jsx)("button", { type: "button", className: "dshse_settingsRestoreAll", disabled: busy || allBatchSessionIds.length === 0, onClick: () => onBatchUnarchive(allBatchTarget), children: t("archives.restoreAll") }), (0, react_jsx_runtime.jsxs)("button", { type: "button", className: "dshse_settingsDanger", disabled: busy || allBatchSessionIds.length === 0, onClick: () => setDeleteTarget({ kind: "batch", target: allBatchTarget, title: t("archives.allProjects"), count: allBatchSessionIds.length }), children: [(0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconTrashOutline16, {}), t("archives.deleteAll")] })] })] }), (0, react_jsx_runtime.jsxs)("div", { className: "dshse_settingsToolbar", children: [(0, react_jsx_runtime.jsxs)("label", { className: "dshse_settingsSearch", children: [(0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconSearchOutline16, {}), (0, react_jsx_runtime.jsx)("input", { type: "search", value: query, onChange: (event) => setQuery(event.target.value), placeholder: t("archives.searchPlaceholder"), "aria-label": t("archives.searchPlaceholder") })] }), (0, react_jsx_runtime.jsx)(ArchiveProjectSelect, { id: "dshse-sort-filter", value: sortBy, options: [{ value: "updated", label: t("archives.sortUpdated") }, { value: "created", label: t("archives.sortCreated") }, { value: "alphabetical", label: t("archives.sortAlphabetical") }], onChange: setSortBy, "aria-label": t("archives.sortBy") }), (0, react_jsx_runtime.jsx)(ArchiveProjectSelect, { id: "dshse-project-filter", value: project, options: [{ value: "all", label: t("archives.allProjects") }, ...sortedGroups.map((group) => ({ value: group.key, label: group.title }))], onChange: setProject, "aria-label": t("archives.projectFilter") })] }), groups.length === 0 ? (0, react_jsx_runtime.jsx)("div", { className: "dshse_settingsEmpty", children: t("archives.empty") }) : filteredGroups.length === 0 ? (0, react_jsx_runtime.jsx)("div", { className: "dshse_settingsEmpty", children: t("archives.emptyFiltered") }) : filteredGroups.map((group) => {
+		children: [(0, react_jsx_runtime.jsx)("style", { children: ARCHIVE_SETTINGS_CSS + ARCHIVE_SETTINGS_BATCH_CSS }), (0, react_jsx_runtime.jsxs)("header", { className: "dshse_settingsHeader", children: [(0, react_jsx_runtime.jsxs)("div", { children: [(0, react_jsx_runtime.jsx)("h2", { children: t("archives.title") }), (0, react_jsx_runtime.jsx)("p", { className: "dshse_settingsIntro", children: t("archives.description") })] }), (0, react_jsx_runtime.jsxs)("div", { className: "dshse_settingsHeaderActions", children: [(0, react_jsx_runtime.jsx)("button", { type: "button", className: "dshse_settingsRestoreAll", disabled: busy, onClick: onSync, children: t("archives.sync") }), (0, react_jsx_runtime.jsx)("button", { type: "button", className: "dshse_settingsRestoreAll", disabled: busy || allBatchSessionIds.length === 0, onClick: () => onBatchUnarchive(allBatchTarget), children: t("archives.restoreAll") }), (0, react_jsx_runtime.jsxs)("button", { type: "button", className: "dshse_settingsDanger", disabled: busy || allBatchSessionIds.length === 0, onClick: () => setDeleteTarget({ kind: "batch", target: allBatchTarget, title: t("archives.allProjects"), count: allBatchSessionIds.length }), children: [(0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconTrashOutline16, {}), t("archives.deleteAll")] })] })] }), (0, react_jsx_runtime.jsxs)("div", { className: "dshse_settingsToolbar", children: [(0, react_jsx_runtime.jsxs)("label", { className: "dshse_settingsSearch", children: [(0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconSearchOutline16, {}), (0, react_jsx_runtime.jsx)("input", { type: "search", value: query, onChange: (event) => setQuery(event.target.value), placeholder: t("archives.searchPlaceholder"), "aria-label": t("archives.searchPlaceholder") })] }), (0, react_jsx_runtime.jsx)(ArchiveProjectSelect, { id: "dshse-sort-filter", value: sortBy, options: [{ value: "updated", label: t("archives.sortUpdated") }, { value: "created", label: t("archives.sortCreated") }, { value: "alphabetical", label: t("archives.sortAlphabetical") }], onChange: setSortBy, "aria-label": t("archives.sortBy") }), (0, react_jsx_runtime.jsx)(ArchiveProjectSelect, { id: "dshse-project-filter", value: project, options: [{ value: "all", label: t("archives.allProjects") }, ...sortedGroups.map((group) => ({ value: group.key, label: group.title }))], onChange: setProject, "aria-label": t("archives.projectFilter") })] }), groups.length === 0 ? emptyDirs.length === 0 ? (0, react_jsx_runtime.jsx)("div", { className: "dshse_settingsEmpty", children: t("archives.empty") }) : null : filteredGroups.length === 0 ? (0, react_jsx_runtime.jsx)("div", { className: "dshse_settingsEmpty", children: t("archives.emptyFiltered") }) : filteredGroups.map((group) => {
 			const target = archivedBatchTargetForGroup(group.key);
 			const count = deriveArchivedBatchIds(workspaceState.archivedSessionIds, workspaceState.items, target).length;
+			const workspace = group.key === ARCHIVE_UNGROUPED_KEY ? void 0 : workspaceState.items.find((item) => item.workspaceId === group.key);
+			const allArchived = workspace !== void 0 && workspace.sessionIds.length > 0 && workspace.sessionIds.every((id) => archivedSet.has(id));
 			return (0, react_jsx_runtime.jsxs)("section", {
 				className: "dshse_settingsGroup",
-				children: [(0, react_jsx_runtime.jsxs)("div", { className: "dshse_settingsGroupHeading", children: [(0, react_jsx_runtime.jsxs)("h3", { className: "dshse_settingsGroupTitle", children: [(0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconFolderOpenOutline16, {}), group.title] }), (0, react_jsx_runtime.jsxs)("div", { className: "dshse_settingsGroupMeta", children: [(0, react_jsx_runtime.jsx)("span", { className: "dshse_settingsCount", children: t("archives.sessionCount", { n: count }) }), (0, react_jsx_runtime.jsx)(ArchivedGroupActions, { group, busy, onRestore: () => onBatchUnarchive(target), onDelete: () => setDeleteTarget({ kind: "batch", target, title: group.title, count }), t })] })] }), (0, react_jsx_runtime.jsx)("div", {
+				children: [(0, react_jsx_runtime.jsxs)("div", { className: "dshse_settingsGroupHeading", children: [(0, react_jsx_runtime.jsxs)("h3", { className: "dshse_settingsGroupTitle", children: [(0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconFolderOpenOutline16, {}), group.title] }), (0, react_jsx_runtime.jsxs)("div", { className: "dshse_settingsGroupMeta", children: [(0, react_jsx_runtime.jsx)("span", { className: "dshse_settingsCount", children: t("archives.sessionCount", { n: count }) }), (0, react_jsx_runtime.jsx)(ArchivedGroupActions, { group, busy, allArchived, onRestore: () => onBatchUnarchive(target), onDelete: () => setDeleteTarget({ kind: "batch", target, title: group.title, count }), onDeleteWorkspace: () => setDeleteTarget({ kind: "workspace", workspaceId: group.key, title: group.title, dirName: workspace !== void 0 ? projectKey(workspace.path) : void 0 }), t })] })] }), (0, react_jsx_runtime.jsx)("div", {
 					className: "dshse_settingsList",
 					children: group.sessions.map((session) => (0, react_jsx_runtime.jsxs)("article", {
 						className: "dshse_settingsRow",
@@ -426,14 +517,26 @@ function ArchivedSessionsSection({ sessionStore, workspaceStore, unarchiveSessio
 					}, session.id))
 				})]
 			}, group.key);
-		}), error !== null && (0, react_jsx_runtime.jsx)("div", { className: "dshse_settingsError", role: "alert", children: error }), notice !== null && (0, react_jsx_runtime.jsx)("div", { className: "dshse_settingsStatus", role: "status", children: notice }), (0, react_jsx_runtime.jsxs)(_deepseek_ai_dsh_client_ui_primitives.Modal, {
+		}), emptyDirs.map((dir) => (0, react_jsx_runtime.jsxs)("section", {
+			className: "dshse_settingsGroup",
+			children: [(0, react_jsx_runtime.jsxs)("div", {
+				className: "dshse_settingsGroupHeading",
+				children: [(0, react_jsx_runtime.jsxs)("h3", {
+					className: "dshse_settingsGroupTitle",
+					children: [(0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconFolderOpenOutline16, {}), workspaceByDirName.get(dir.name.toLowerCase())?.title ?? emptyDirLabel(dir.name)]
+				}), (0, react_jsx_runtime.jsxs)("div", {
+					className: "dshse_settingsGroupMeta",
+					children: [(0, react_jsx_runtime.jsx)("span", { className: "dshse_settingsCount", children: t("archives.sessionCount", { n: 0 }) }), (0, react_jsx_runtime.jsx)("button", { type: "button", className: "dshse_settingsDelete", disabled: busy, "aria-label": t("archives.emptyDirDelete"), onClick: () => setDeleteTarget({ kind: "workspaceDir", name: dir.name, path: dir.path, workspaceId: workspaceByDirName.get(dir.name.toLowerCase())?.workspaceId }), children: (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconTrashOutline16, {}) })]
+				})]
+			})]
+		}, dir.name)), error !== null && (0, react_jsx_runtime.jsx)("div", { className: "dshse_settingsError", role: "alert", children: error }), notice !== null && (0, react_jsx_runtime.jsx)("div", { className: "dshse_settingsStatus", role: "status", children: notice }), (0, react_jsx_runtime.jsxs)(_deepseek_ai_dsh_client_ui_primitives.Modal, {
 			open: deleteTarget !== null,
 			onClose: closeDelete,
 			closeLabel: t("close"),
 			title: deleteDialogTitle,
 			...deleteDialogDescription === void 0 ? {} : { description: deleteDialogDescription },
 			footer: (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [(0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, { variant: "outline", disabled: busy, onClick: closeDelete, children: t("cancel") }), (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, { variant: "outline", disabled: busy, onClick: confirmDelete, children: deleteConfirmLabel })] }),
-			children: busy && (0, react_jsx_runtime.jsx)("div", { role: "status", children: deleteTarget?.kind === "batch" ? t("archives.deleteBatchPending") : t("deleteSession.pending") })
+			children: busy && (0, react_jsx_runtime.jsx)("div", { role: "status", children: deleteTarget?.kind === "workspace" ? t("delete.pending") : deleteTarget?.kind === "workspaceDir" ? t("archives.emptyDirDeletePending") : deleteTarget?.kind === "batch" ? t("archives.deleteBatchPending") : t("deleteSession.pending") })
 		})]
 	});
 }

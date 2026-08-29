@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, readFile, writeFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir, homedir } from "node:os";
-import { DEFAULT_SETTINGS, normalizeSettings, readSettings, storagesRootFor, writeSettings } from "../lib/settings.js";
+import { DEFAULT_SETTINGS, normalizeSettings, readSettings, sessionsRootFor, storagesRootFor, writeSettings } from "../lib/settings.js";
 
 test("normalizeSettings: fills defaults and trims homeDir", () => {
 	assert.deepEqual(normalizeSettings(undefined), { ...DEFAULT_SETTINGS });
@@ -19,6 +19,12 @@ test("storagesRootFor: expands tilde and joins storages", () => {
 	assert.equal(storagesRootFor("~"), join(homedir(), "storages"));
 	// 绝对路径按平台规则解析后追加 storages（Windows 会补上盘符）。
 	assert.ok(storagesRootFor("/opt/dsh").endsWith(join("dsh", "storages")));
+});
+
+test("sessionsRootFor: expands tilde and joins sessions", () => {
+	assert.equal(sessionsRootFor("~/.dsh"), join(homedir(), ".dsh", "sessions"));
+	assert.equal(sessionsRootFor("~"), join(homedir(), "sessions"));
+	assert.ok(sessionsRootFor("/opt/dsh").endsWith(join("dsh", "sessions")));
 });
 
 test("readSettings: missing and corrupted files fall back to defaults", async () => {
