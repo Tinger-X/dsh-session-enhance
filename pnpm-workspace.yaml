@@ -1,3 +1,5 @@
+allowBuilds:
+  esbuild: true
 # pnpm 设置（pnpm 11.21+ 从 pnpm-workspace.yaml 读取，package.json 的
 # "pnpm" 字段已被忽略）。
 # overrides：强制 @deepseek-ai/* 传递依赖钉到 0.1.1-rc.2，绕过其损坏的
