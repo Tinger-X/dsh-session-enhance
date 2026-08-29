@@ -187,6 +187,22 @@ function applyWorkspaceBrowser(ctx) {
 		if (!result.ok) throw new Error(result.error.message);
 		return result.value;
 	};
+	/** PLUS：列出可清理的空工作区目录（sessions 根目录下的空子目录残留）。 */
+	const listEmptyWorkspaceDirectories = async () => {
+		const registry = ctx.get("remote.workspaceRegistry");
+		if (registry === void 0) throw new Error("dsh-session-enhance remote service is unavailable");
+		const result = await registry.listEmptyWorkspaceDirectories();
+		if (!result.ok) throw new Error(result.error.message);
+		return result.value;
+	};
+	/** PLUS：删除一个空工作区目录残留（仅接受 sessions 根目录的直接子目录名）。 */
+	const deleteEmptyWorkspaceDirectory = async (name) => {
+		const registry = ctx.get("remote.workspaceRegistry");
+		if (registry === void 0) throw new Error("dsh-session-enhance remote service is unavailable");
+		const result = await registry.deleteEmptyWorkspaceDirectory(name);
+		if (!result.ok) throw new Error(result.error.message);
+		return result.value;
+	};
 	// PLUS：对话通知（对话结束/需要操作时，未聚焦且启用通知则弹出系统提示）。
 	ctx.effect(() => installConversationNotifier(ctx, getSettings, ctx.locale.bind(NS)), "dsh-session-enhance: conversation notifier");
 	const browserInjected = () => ({
@@ -276,6 +292,11 @@ function applyWorkspaceBrowser(ctx) {
 			syncRecords,
 			getSettings,
 			setSettings,
+			listEmptyWorkspaceDirectories,
+			deleteEmptyWorkspaceDirectory,
+			deleteWorkspace: async (workspaceId) => {
+				await ctx.workspaces.delete(workspaceId);
+			},
 			pickDirectory: () => ctx.workspaces.pickDirectory(),
 			t: ctx.locale.bind(NS)
 		})
