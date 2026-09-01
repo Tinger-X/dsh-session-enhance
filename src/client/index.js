@@ -163,6 +163,14 @@ function applyWorkspaceBrowser(ctx) {
 		if (!result.ok) throw new Error(result.error.message);
 		return result.value;
 	};
+	/** PLUS：读取归档会话的转录消息（预览对话）。 */
+	const previewSession = async (sessionId) => {
+		const registry = ctx.get("remote.workspaceRegistry");
+		if (registry === void 0) throw new Error("dsh-session-enhance remote service is unavailable");
+		const result = await registry.previewSession(sessionId);
+		if (!result.ok) throw new Error(result.error.message);
+		return result.value;
+	};
 	/** PLUS：按物理 session 文件同步 storages 记录（清理幽灵/修正归属/补记漏记）。 */
 	const syncRecords = async () => {
 		const registry = ctx.get("remote.workspaceRegistry");
@@ -289,6 +297,7 @@ function applyWorkspaceBrowser(ctx) {
 			unarchiveSessions,
 			deleteArchivedSessions,
 			archivedSessionMetadata,
+			previewSession,
 			syncRecords,
 			getSettings,
 			setSettings,

@@ -129,6 +129,24 @@ const workspaceDirectoryDeletedSchema = {
 		return value;
 	}
 };
+/** 归档会话预览结果：`{ sessionId, messages: [{ kind, text, tag?, name?, label? }] }`。 */
+const previewSessionSchema = {
+	parse(value) {
+		if (typeof value !== "object" || value === null || Array.isArray(value)) throw new TypeError("result must be an object");
+		if (typeof value.sessionId !== "string" || value.sessionId.length === 0) throw new TypeError("sessionId must be a non-empty string");
+		if (!Array.isArray(value.messages)) throw new TypeError("messages must be an array");
+		for (const message of value.messages) {
+			if (typeof message !== "object" || message === null) throw new TypeError("messages must contain objects");
+			if (message.kind !== "user" && message.kind !== "assistant" && message.kind !== "system") throw new TypeError("message.kind must be user, assistant, or system");
+			if (typeof message.text !== "string") throw new TypeError("message.text must be a string");
+			if (message.time !== void 0 && (typeof message.time !== "number" || !Number.isFinite(message.time))) throw new TypeError("message.time must be a finite number when provided");
+			for (const key of ["tag", "name", "label"]) {
+				if (message[key] !== void 0 && typeof message[key] !== "string") throw new TypeError(`message.${key} must be a string when provided`);
+			}
+		}
+		return value;
+	}
+};
 const SESSION_ENHANCE_REMOTE = {
 	package: "dsh-session-enhance",
 	descriptors: [
@@ -219,6 +237,25 @@ const SESSION_ENHANCE_REMOTE = {
 				mode: "strict",
 				typeSymbol: "dsh-session-enhance/types#ArchivedSessionMetadata",
 				schema: archivedSessionMetadataSchema
+			},
+			sourceLocation: { file: "dsh-session-enhance/lib/workspace.js", line: 1, column: 1 }
+		},
+		{
+			id: "dsh-session-enhance#workspaceRegistry/previewSession",
+			service: "workspaceRegistry",
+			namespace: "workspaceRegistry",
+			method: "previewSession",
+			invocation: { kind: "direct" },
+			parameters: [{
+				name: "sessionId",
+				wire: "sessionId",
+				source: "json",
+				codec: { mode: "strict", typeSymbol: "@deepseek-ai/dsh-session/types#SessionId", schema: sessionIdSchema }
+			}],
+			result: {
+				mode: "strict",
+				typeSymbol: "dsh-session-enhance/types#SessionPreview",
+				schema: previewSessionSchema
 			},
 			sourceLocation: { file: "dsh-session-enhance/lib/workspace.js", line: 1, column: 1 }
 		},

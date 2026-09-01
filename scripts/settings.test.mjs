@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, readFile, writeFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir, homedir } from "node:os";
-import { DEFAULT_SETTINGS, normalizeSettings, readSettings, sessionsRootFor, storagesRootFor, writeSettings } from "../lib/settings.js";
+import { DEFAULT_SETTINGS, normalizeSettings, readSettings, sessionsRootFor, storagesRootFor, attachmentsRootFor, writeSettings } from "../lib/settings.js";
 
 test("normalizeSettings: fills defaults and trims homeDir", () => {
 	assert.deepEqual(normalizeSettings(undefined), { ...DEFAULT_SETTINGS });
@@ -25,6 +25,12 @@ test("sessionsRootFor: expands tilde and joins sessions", () => {
 	assert.equal(sessionsRootFor("~/.dsh"), join(homedir(), ".dsh", "sessions"));
 	assert.equal(sessionsRootFor("~"), join(homedir(), "sessions"));
 	assert.ok(sessionsRootFor("/opt/dsh").endsWith(join("dsh", "sessions")));
+});
+
+test("attachmentsRootFor: expands tilde and joins attachments", () => {
+	assert.equal(attachmentsRootFor("~/.dsh"), join(homedir(), ".dsh", "attachments"));
+	assert.equal(attachmentsRootFor("~"), join(homedir(), "attachments"));
+	assert.ok(attachmentsRootFor("/opt/dsh").endsWith(join("dsh", "attachments")));
 });
 
 test("readSettings: missing and corrupted files fall back to defaults", async () => {
