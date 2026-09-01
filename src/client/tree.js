@@ -14,7 +14,7 @@
 
 const CSS_ID = "dsh-session-enhance/tree.module.css";
 const CSS = [
-	".dshct_panel{position:fixed;z-index:2000;display:flex;flex-direction:column;overflow:hidden;pointer-events:none}",
+	".dshct_panel{position:fixed;z-index:200;display:flex;flex-direction:column;overflow:hidden;pointer-events:none}",
 	".dshct_scroll{position:relative;flex:1 1 auto;overflow-y:auto;overflow-x:hidden;pointer-events:auto;scrollbar-width:none}",
 	".dshct_scroll::-webkit-scrollbar{display:none}",
 	".dshct_content{position:relative}",
@@ -98,6 +98,8 @@ export function installConversationTree(ctx, api) {
 	let disposed = false;
 	let conversation = null;
 	let actionTip = null;
+	let resizeObserver = null;
+	let observedTargets = null;
 
 	function showActionTip(text, anchor) {
 		hideActionTip();
@@ -141,11 +143,22 @@ export function installConversationTree(ctx, api) {
 		}
 	}
 
+	/** 当前可见的会话中栏；仅「对话」视图（chat）存在且可见时返回。
+	 *  「轨迹」等其它视图虽共享同一会话中栏，但不渲染 `[data-chat-flow]`，据此排除。 */
+	function conversationPane() {
+		const conv = document.querySelector('[data-pane="conversation"]') ?? document.querySelector('[data-slot="conversation"]');
+		if (conv === null || !conv.isConnected) return null;
+		const style = window.getComputedStyle(conv);
+		if (style.display === "none" || style.visibility === "hidden") return null;
+		if (conv.querySelector("[data-chat-flow]") === null && document.querySelector("[data-chat-flow]") === null) return null;
+		return conv;
+	}
+
 	/** 定位会话中栏及 header / scrollport / composer（官方 shell 语义属性）。 */
 	function findAnchors() {
-		const conv = document.querySelector('[data-pane="conversation"]') ?? document.querySelector('[data-slot="conversation"]');
-		const scrollport = document.querySelector("[data-conversation-scroll]")
-			?? (conv !== null ? conv.querySelector("[data-conversation-scroll]") : null);
+		const conv = conversationPane();
+		const scrollport = (conv !== null ? conv.querySelector("[data-conversation-scroll]") : null)
+			?? document.querySelector("[data-conversation-scroll]");
 		let header = document.querySelector('[data-slot="conversation.session.header"] > header')
 			?? document.querySelector('[data-slot="conversation.session.header"]');
 		if (header === null && scrollport !== null) {
@@ -205,13 +218,40 @@ export function installConversationTree(ctx, api) {
 	}
 
 	function removePanel() {
+		if (resizeObserver !== null) {
+			resizeObserver.disconnect();
+			resizeObserver = null;
+		}
+		observedTargets = null;
 		if (panel !== null && panel.isConnected) panel.remove();
 		panel = null;
 		scrollEl = null;
 		contentEl = null;
-		tree = null;
+		// 保留 tree 缓存：切回「对话」视图时可立即渲染，无需等 debounced load。
 		hideTooltip();
 		hideActionTip();
+	}
+
+	/** 布局尺寸变化（如侧栏收起/展开）时重排面板。ResizeObserver 在布局结算后触发，
+	 *  弥补 window resize 不覆盖侧栏折叠、以及 MutationObserver 先于布局结算的时序。 */
+	function watchLayoutResize() {
+		if (typeof ResizeObserver === "undefined") return;
+		const anchors = findAnchors();
+		const targets = [anchors.conv, anchors.scrollport].filter((el) => el !== null && el.isConnected);
+		// 目标元素未变化时无需重建观察器，避免每次 MutationObserver 触发都反复 disconnect/observe。
+		if (observedTargets !== null
+			&& observedTargets.length === targets.length
+			&& observedTargets.every((el, index) => el === targets[index])) {
+			return;
+		}
+		observedTargets = targets;
+		if (resizeObserver !== null) {
+			resizeObserver.disconnect();
+			resizeObserver = null;
+		}
+		if (targets.length === 0) return;
+		resizeObserver = new ResizeObserver(() => layoutPanel());
+		for (const target of targets) resizeObserver.observe(target);
 	}
 
 	function hideTooltip() {
@@ -354,12 +394,14 @@ export function installConversationTree(ctx, api) {
 	}
 
 	function ensurePanel() {
-		const anchors = findAnchors();
-		if (anchors.conv === null && anchors.scrollport === null) {
+		const conv = conversationPane();
+		if (conv === null) {
 			removePanel();
 			return;
 		}
-		conversation = anchors.conv;
+		const anchors = findAnchors();
+		conversation = conv;
+		watchLayoutResize();
 		if (panel !== null && panel.isConnected) {
 			layoutPanel();
 			return;
@@ -371,6 +413,7 @@ export function installConversationTree(ctx, api) {
 		panel.appendChild(scrollEl);
 		document.body.appendChild(panel);
 		layoutPanel();
+		if (tree !== null) render();
 	}
 
 	function treeSignature(value) {
@@ -389,6 +432,7 @@ export function installConversationTree(ctx, api) {
 			return;
 		}
 		ensurePanel();
+		if (panel === null) return;
 		layoutPanel();
 		loading = true;
 		try {
@@ -692,7 +736,7 @@ export function installConversationTree(ctx, api) {
 	// 仅观察结构性变化（新增消息行 / turn-tail 出现），用于「发送消息」「LLM 回复完成」；
 	// 不观察 characterData，避免流式输出期间高频触发。
 	const observer = new MutationObserver(() => {
-		layoutPanel();
+		ensurePanel();
 		scheduleLoad();
 	});
 	observer.observe(document.body, { childList: true, subtree: true });
