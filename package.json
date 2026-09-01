@@ -1,6 +1,6 @@
 {
   "name": "dsh-session-enhance",
-  "version": "0.2.7",
+  "version": "0.2.8",
   "description": "DSH Web plugin for managing sessions: archive/unarchive, guaranteed physical deletion (transcript files + ~/storages/*.json sweep), and drag-and-drop workspace reassignment.",
   "type": "module",
   "packageManager": "pnpm@11.24.0",

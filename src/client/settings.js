@@ -28,9 +28,210 @@ function emptyDirLabel(name) {
 	const last = core.split("-").filter(Boolean).pop();
 	return last || name;
 }
+/** 预览对话：眼睛图标（primitive 未提供，hand-authored，16 网格）。 */
+function EyeIcon() {
+	return (0, react_jsx_runtime.jsxs)("svg", {
+		width: 16,
+		height: 16,
+		viewBox: "0 0 16 16",
+		fill: "none",
+		"aria-hidden": true,
+		children: [(0, react_jsx_runtime.jsx)("path", {
+			d: "M1.5 8S4.2 3.5 8 3.5 14.5 8 14.5 8 11.8 12.5 8 12.5 1.5 8 1.5 8Z",
+			stroke: "currentColor",
+			strokeWidth: "1.3",
+			strokeLinecap: "round",
+			strokeLinejoin: "round"
+		}), (0, react_jsx_runtime.jsx)("circle", {
+			cx: "8",
+			cy: "8",
+			r: "1.8",
+			stroke: "currentColor",
+			strokeWidth: "1.3"
+		})]
+	});
+}
+/** 取消归档：单条恢复（撤销箭头）图标（primitive 未提供）。 */
+function RestoreIcon() {
+	return (0, react_jsx_runtime.jsxs)("svg", {
+		width: 16,
+		height: 16,
+		viewBox: "0 0 16 16",
+		fill: "none",
+		"aria-hidden": true,
+		children: [(0, react_jsx_runtime.jsx)("path", {
+			d: "M6 10.5 2.5 7 6 3.5",
+			stroke: "currentColor",
+			strokeWidth: "1.3",
+			strokeLinecap: "round",
+			strokeLinejoin: "round"
+		}), (0, react_jsx_runtime.jsx)("path", {
+			d: "M2.5 7h6.5a4 4 0 0 1 0 8H7",
+			stroke: "currentColor",
+			strokeWidth: "1.3",
+			strokeLinecap: "round",
+			strokeLinejoin: "round"
+		})]
+	});
+}
+/** 全部恢复：双撤销箭头图标，与单条「恢复」图标区分（primitive 未提供）。 */
+function RestoreAllIcon() {
+	return (0, react_jsx_runtime.jsxs)("svg", {
+		width: 16,
+		height: 16,
+		viewBox: "0 0 16 16",
+		fill: "none",
+		"aria-hidden": true,
+		children: [(0, react_jsx_runtime.jsx)("path", {
+			d: "M5.5 8.5 2.5 5.5 5.5 2.5",
+			stroke: "currentColor",
+			strokeWidth: "1.3",
+			strokeLinecap: "round",
+			strokeLinejoin: "round"
+		}), (0, react_jsx_runtime.jsx)("path", {
+			d: "M2.5 5.5h5.5a3.5 3.5 0 0 1 0 7",
+			stroke: "currentColor",
+			strokeWidth: "1.3",
+			strokeLinecap: "round",
+			strokeLinejoin: "round"
+		}), (0, react_jsx_runtime.jsx)("path", {
+			d: "M10 13 7 10l3-3",
+			stroke: "currentColor",
+			strokeWidth: "1.3",
+			strokeLinecap: "round",
+			strokeLinejoin: "round"
+		}), (0, react_jsx_runtime.jsx)("path", {
+			d: "M7 10h5.5a3.5 3.5 0 0 1 0 7",
+			stroke: "currentColor",
+			strokeWidth: "1.3",
+			strokeLinecap: "round",
+			strokeLinejoin: "round"
+		})]
+	});
+}
+/** 系统消息的标签文案：优先用后端给出的 label，其次按 tag/name 组合。 */
+function systemMessageLabel(message, t) {
+	if (message.label !== void 0) return message.label;
+	if (message.tag === "tool-call") return message.name !== void 0 ? t("archives.previewToolCallName", { name: message.name }) : t("archives.previewToolCall");
+	if (message.tag === "tool") return message.name !== void 0 ? t("archives.previewToolResultName", { name: message.name }) : t("archives.previewToolResult");
+	return t("archives.previewContext");
+}
+/** 按「回合」分组：每个用户消息开启一回合，其后的 LLM/系统消息归属该回合。 */
+function groupPreviewTurns(messages) {
+	const turns = [];
+	let current = null;
+	for (const message of messages) {
+		if (message.kind === "user") {
+			current = { user: message, items: [message] };
+			turns.push(current);
+		} else if (current !== null) {
+			current.items.push(message);
+		} else {
+			current = { user: null, items: [message] };
+			turns.push(current);
+		}
+	}
+	return turns;
+}
+/** 把一回合内的消息整理为渲染块：连续 system 合并为一行，并记录其对齐（跟随前一条 user/LLM）。 */
+function buildTurnBlocks(items) {
+	const blocks = [];
+	for (const message of items) {
+		if (message.kind === "system") {
+			const last = blocks[blocks.length - 1];
+			if (last !== void 0 && last.kind === "system-group") {
+				last.messages.push(message);
+			} else {
+				const previous = last;
+				blocks.push({ kind: "system-group", messages: [message], align: previous !== void 0 && previous.kind === "user" ? "right" : "left" });
+			}
+		} else {
+			blocks.push({ kind: message.kind, message });
+		}
+	}
+	return blocks;
+}
+/** 用户头像：圆形底 + 人形剪影（SVG，随主题着色）。 */
+function UserAvatarIcon({ className }) {
+	return (0, react_jsx_runtime.jsxs)("svg", {
+		width: 22,
+		height: 22,
+		viewBox: "0 0 22 22",
+		className,
+		"aria-hidden": true,
+		children: [(0, react_jsx_runtime.jsx)("circle", { cx: "11", cy: "11", r: "11", fill: "currentColor", opacity: "0.16" }), (0, react_jsx_runtime.jsx)("circle", { cx: "11", cy: "8.6", r: "3", fill: "currentColor" }), (0, react_jsx_runtime.jsx)("path", { d: "M4.4 19.2c.9-3.1 3.4-4.8 6.6-4.8s5.7 1.7 6.6 4.8", fill: "none", stroke: "currentColor", strokeWidth: "1.9", strokeLinecap: "round" })]
+	});
+}
+/** LLM 头像：DeepSeek 鲸鱼 logo（圆形底 + FishLogo，随主题着色）。 */
+function AssistantAvatarIcon({ className }) {
+	return (0, react_jsx_runtime.jsx)("span", {
+		className,
+		"aria-hidden": true,
+		children: (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.FishLogo, { size: 16 })
+	});
+}
+/** 用户/助手单条消息：头像与气泡同行，时间置于气泡底部并随消息对齐；收起按钮置于头像与气泡之间。 */
+function PreviewMessageLine({ message, isUser, toggle, collapsed, t }) {
+	const timeLabel = typeof message.time === "number" ? archiveTimeLabel(message.time, t) : null;
+	const bubble = (0, react_jsx_runtime.jsx)("div", {
+		className: isUser && collapsed ? "dshse_previewBubble dshse_previewBubbleCollapsed" : "dshse_previewBubble",
+		children: (0, react_jsx_runtime.jsx)("div", { className: "dshse_previewText", children: message.text })
+	});
+	const avatarEl = isUser ? (0, react_jsx_runtime.jsx)(UserAvatarIcon, { className: "dshse_previewAvatarUser" }) : (0, react_jsx_runtime.jsx)(AssistantAvatarIcon, { className: "dshse_previewAvatarAssistant" });
+	const lineChildren = isUser ? [bubble, toggle, avatarEl] : [avatarEl, bubble];
+	return (0, react_jsx_runtime.jsxs)("div", {
+		className: isUser ? "dshse_previewMsg dshse_previewMsgUser" : "dshse_previewMsg dshse_previewMsgAssistant",
+		children: [(0, react_jsx_runtime.jsx)("div", { className: "dshse_previewMsgLine", children: lineChildren }), timeLabel !== null ? (0, react_jsx_runtime.jsx)("div", { className: "dshse_previewMsgTime", children: timeLabel }) : null]
+	});
+}
+/** 一行连续的系统消息（标签不换行）。 */
+function PreviewSystemRow({ messages, align, t }) {
+	return (0, react_jsx_runtime.jsx)("div", {
+		className: align === "right" ? "dshse_previewSystem dshse_previewSystemRight" : "dshse_previewSystem dshse_previewSystemLeft",
+		children: messages.map((message, index) => (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Tooltip, {
+			label: message.text,
+			side: "bottom",
+			maxWidth: 360,
+			children: (0, react_jsx_runtime.jsxs)("span", {
+				className: "dshse_previewTag",
+				children: [(0, react_jsx_runtime.jsx)("span", { className: "dshse_previewTagDot" }), (0, react_jsx_runtime.jsx)("span", { className: "dshse_previewTagLabel", children: systemMessageLabel(message, t) })]
+			})
+		}, index))
+	});
+}
+/** 一个对话回合：仅在用户消息处提供收起/展开，收起时把用户消息截断为单行并隐藏其后的回复。 */
+function PreviewTurn({ turn, t }) {
+	const [collapsed, setCollapsed] = (0, react.useState)(false);
+	const blocks = (0, react.useMemo)(() => buildTurnBlocks(turn.items), [turn.items]);
+	const canCollapse = turn.user !== null;
+	const userBlock = blocks.find((block) => block.kind === "user");
+	const restBlocks = blocks.filter((block) => block.kind !== "user");
+	const toggle = canCollapse ? (0, react_jsx_runtime.jsx)("button", {
+		type: "button",
+		className: "dshse_previewToggle",
+		"aria-expanded": !collapsed,
+		"aria-label": collapsed ? t("archives.expandTurn") : t("archives.collapseTurn"),
+		onClick: () => setCollapsed((current) => !current),
+		children: (0, react_jsx_runtime.jsx)("span", {
+			className: collapsed ? "dshse_previewToggleIcon dshse_previewToggleIconCollapsed" : "dshse_previewToggleIcon",
+			children: (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconChevronDownOutline14, {})
+		})
+	}) : null;
+	return (0, react_jsx_runtime.jsxs)("div", {
+		className: "dshse_previewTurn",
+		children: [userBlock !== void 0 ? (0, react_jsx_runtime.jsx)(PreviewMessageLine, { message: userBlock.message, isUser: true, toggle, collapsed, t }) : null, restBlocks.length > 0 ? (0, react_jsx_runtime.jsx)("div", {
+			className: collapsed ? "dshse_previewTurnBody dshse_previewTurnBodyCollapsed" : "dshse_previewTurnBody",
+			children: (0, react_jsx_runtime.jsx)("div", {
+				className: "dshse_previewTurnBodyInner",
+				children: restBlocks.map((block, index) => block.kind === "system-group" ? (0, react_jsx_runtime.jsx)(PreviewSystemRow, { messages: block.messages, align: block.align, t }, index) : (0, react_jsx_runtime.jsx)(PreviewMessageLine, { message: block.message, isUser: false, t }, index))
+			})
+		}) : null]
+	});
+}
 
 const ARCHIVE_SETTINGS_CSS = ".dshse_settings{box-sizing:border-box;width:min(100%,760px);margin:0 auto;padding:0 0 32px;color:var(--dsw-alias-label-primary)}.dshse_settingsHeader{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:12px}.dshse_settings h2{margin:0;font-size:20px;font-weight:650;letter-spacing:-.2px;line-height:28px}.dshse_settingsIntro{margin:4px 0 0;max-width:42em;color:var(--dsw-alias-label-tertiary);font-size:13px;line-height:1.5}.dshse_settingsDanger{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:0 12px;color:var(--dsw-alias-state-error-primary);background:transparent;border:1px solid var(--dsw-alias-state-error-primary);border-radius:8px;cursor:pointer;font:inherit;font-size:13px;font-weight:500}.dshse_settingsDanger:hover{background:color-mix(in srgb,var(--dsw-alias-state-error-primary) 20%,transparent)}.dshse_settingsToolbar{display:flex;gap:8px;margin-bottom:16px}.dshse_settingsSearch{display:flex;align-items:center;gap:8px;min-width:0;flex:1;height:32px;padding:0 12px;color:var(--dsw-alias-label-tertiary);background:var(--dsw-alias-bg-layer-3,var(--dsw-alias-button-elevated-fill));border:1px solid var(--dsw-alias-border-l2);border-radius:8px}.dshse_settingsSearch:focus-within{border-color:var(--dsw-alias-label-tertiary)}.dshse_settingsSearch input{width:100%;min-width:0;padding:0;color:var(--dsw-alias-label-primary);background:transparent;border:0;outline:0;font:inherit;font-size:12px}.dshse_settingsSearch input::placeholder{color:var(--dsw-alias-label-tertiary)}.dshse_settingsFilter{position:relative;min-width:168px;flex:none}.dshse_selectTrigger{box-sizing:border-box;display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;min-height:32px;padding:0 10px;color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-layer-3,var(--dsw-alias-button-elevated-fill));border:1px solid var(--dsw-alias-border-l2);border-radius:8px;cursor:pointer;font:inherit;font-size:13px;line-height:20px;text-align:left}.dshse_selectTrigger:hover{background:var(--dsw-alias-interactive-bg-hover)}.dshse_selectTrigger:focus-visible{outline:2px solid var(--dsw-alias-state-business-primary);outline-offset:2px}.dshse_selectTrigger[aria-expanded='true']{border-color:var(--dsw-alias-label-primary)}.dshse_selectValue{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dshse_selectCaret{flex:none;width:12px;height:12px;color:var(--dsw-alias-label-tertiary)}.dshse_selectMenu{position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:30;box-sizing:border-box;min-width:100%;max-height:280px;overflow:auto;padding:4px;border:1px solid var(--dsw-alias-border-l2);border-radius:10px;background:var(--dsw-specific-menu,var(--dsw-alias-bg-layer-2));box-shadow:var(--dsw-shadow-lv3)}.dshse_selectOption{box-sizing:border-box;display:flex;align-items:center;width:100%;min-height:32px;padding:0 10px;border:0;border-radius:8px;background:transparent;color:var(--dsw-alias-label-primary);font:inherit;font-size:13px;line-height:20px;text-align:left;cursor:pointer}.dshse_selectOption:hover,.dshse_selectOption[data-active='true']{background:var(--dsw-alias-interactive-bg-hover)}.dshse_selectOption[aria-selected='true']{color:var(--dsw-alias-label-primary)}.dshse_settingsGroup{margin:0 0 20px}.dshse_settingsGroupHeading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 14px}.dshse_settingsGroupTitle{display:flex;align-items:center;gap:8px;min-width:0;margin:0;color:var(--dsw-alias-label-primary);font-size:13px;font-weight:600}.dshse_settingsGroupTitle svg{flex:none;color:var(--dsw-alias-label-secondary)}.dshse_settingsCount{flex:none;color:var(--dsw-alias-label-tertiary);font-size:12px}.dshse_settingsList{overflow:hidden;border:1px solid var(--dsw-alias-border-l2);border-radius:12px;background:var(--dsw-alias-bg-layer-2,var(--dsw-alias-button-elevated-fill))}.dshse_settingsRow{display:flex;align-items:center;gap:12px;min-height:60px;padding:10px 16px;border-bottom:1px solid var(--dsw-alias-border-l2)}.dshse_settingsRow:last-child{border-bottom:0}.dshse_settingsContent{min-width:0;flex:1}.dshse_settingsTitle{overflow:hidden;color:var(--dsw-alias-label-primary);font-size:13px;font-weight:600;line-height:18px;text-overflow:ellipsis;white-space:nowrap}.dshse_settingsMeta{margin-top:2px;color:var(--dsw-alias-label-tertiary);font-size:12px;line-height:16px}.dshse_settingsActions{display:flex;align-items:center;gap:8px}.dshse_settingsAction{min-height:32px;padding:0 12px;color:var(--dsw-alias-label-primary);background:transparent;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;cursor:pointer;font:inherit;font-size:13px;font-weight:500}.dshse_settingsAction:hover{filter:brightness(1.12)}.dshse_settingsDelete{display:flex;align-items:center;justify-content:center;width:28px;height:28px;color:var(--dsw-alias-label-tertiary);background:transparent;border:0;border-radius:8px;cursor:pointer}.dshse_settingsDelete:hover{color:var(--dsw-alias-state-error-primary);background:var(--dsw-alias-interactive-bg-hover)}.dshse_settingsEmpty{padding:28px 8px;color:var(--dsw-alias-label-secondary);text-align:center}.dshse_settingsError{margin-top:10px;color:var(--dsw-alias-state-error-primary);font-size:12px}@media(max-width:720px){.dshse_settings{width:100%;margin:28px auto 48px;padding:0 16px}.dshse_settingsHeader{margin-bottom:28px}.dshse_settingsToolbar{flex-wrap:wrap;margin-bottom:28px}.dshse_settingsSearch{flex-basis:100%}.dshse_settingsFilter{flex:1;min-width:0}.dshse_settingsGroup{margin-bottom:32px}.dshse_settingsRow{padding:10px 12px}.dshse_settingsActions{gap:4px}}";
 const ARCHIVE_SETTINGS_BATCH_CSS = ".dshse_settingsHeaderActions,.dshse_settingsGroupMeta{display:flex;align-items:center;gap:8px;flex:none}.dshse_settingsRestoreAll{display:inline-flex;align-items:center;min-height:32px;padding:0 12px;color:var(--dsw-alias-label-primary);background:transparent;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;cursor:pointer;font:inherit;font-size:13px;font-weight:500}.dshse_settingsRestoreAll:hover{background:var(--dsw-alias-interactive-bg-hover)}.dshse_settingsRestoreAll:disabled,.dshse_settingsDanger:disabled,.dshse_settingsGroupMenu:disabled{cursor:not-allowed;opacity:.5}.dshse_settingsGroupMenu{display:flex;align-items:center;justify-content:center;width:28px;height:28px;padding:0;color:var(--dsw-alias-label-tertiary);background:transparent;border:0;border-radius:8px;cursor:pointer}.dshse_settingsGroupMenu:hover{color:var(--dsw-alias-label-primary);background:var(--dsw-alias-interactive-bg-hover)}.dshse_settingsStatus{margin-top:10px;color:var(--dsw-alias-label-secondary);font-size:12px}@media(max-width:720px){.dshse_settingsHeader{flex-direction:column}.dshse_settingsHeaderActions{align-self:flex-end}}";
+const ARCHIVE_PREVIEW_CSS = ".dshse_settingsIconButton{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;padding:0;color:var(--dsw-alias-label-tertiary);background:transparent;border:0;border-radius:8px;cursor:pointer}.dshse_settingsIconButton:hover{color:var(--dsw-alias-label-primary);background:var(--dsw-alias-interactive-bg-hover)}.dshse_settingsIconButton:disabled{cursor:not-allowed;opacity:.5}.dshse_redIcon{color:var(--dsw-alias-state-error-primary)}.dshse_previewModal{width:min(760px,100%)!important}.dshse_previewBody{box-sizing:border-box;max-height:min(66vh,600px);overflow:auto;padding:12px 4px;display:flex;flex-direction:column;gap:14px}.dshse_previewTurn{display:flex;flex-direction:column;gap:8px}.dshse_previewTurnBody{display:grid;grid-template-rows:1fr;opacity:1;transition:grid-template-rows .18s ease,opacity .12s ease .08s}.dshse_previewTurnBodyCollapsed{grid-template-rows:0fr;opacity:0;transition:opacity .12s ease,grid-template-rows .18s ease .12s}.dshse_previewTurnBodyInner{min-height:0;overflow:hidden;display:flex;flex-direction:column;gap:8px}.dshse_previewToggle{display:inline-flex;align-items:center;justify-content:center;flex:none;width:20px;height:20px;margin-top:2px;padding:0;border:1px solid var(--dsw-alias-border-l2);border-radius:6px;background:var(--dsw-alias-bg-layer-3,var(--dsw-alias-button-elevated-fill));color:var(--dsw-alias-label-primary);cursor:pointer}.dshse_previewToggle:hover{background:var(--dsw-alias-interactive-bg-hover);border-color:var(--dsw-alias-label-dimmed)}.dshse_previewToggleIcon{display:inline-flex;transition:transform .2s ease}.dshse_previewToggleIconCollapsed{transform:rotate(-90deg)}.dshse_previewMsg{display:flex;flex-direction:column;gap:4px;max-width:82%}.dshse_previewMsgUser{align-self:flex-end;align-items:flex-end}.dshse_previewMsgAssistant{align-self:flex-start;align-items:flex-start}.dshse_previewMsgLine{display:flex;align-items:flex-start;gap:8px;min-width:0}.dshse_previewAvatarUser{flex:none;display:block;color:var(--dsw-alias-state-business-primary)}.dshse_previewAvatarAssistant{flex:none;display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:color-mix(in srgb,var(--dsw-alias-label-primary) 14%,transparent);color:var(--dsw-alias-label-primary)}.dshse_previewBubble{box-sizing:border-box;min-width:0;padding:10px 12px;border:1px solid var(--dsw-alias-border-l2);border-radius:12px;background:var(--dsw-alias-bg-layer-3,var(--dsw-alias-button-elevated-fill))}.dshse_previewMsgUser .dshse_previewBubble{background:color-mix(in srgb,var(--dsw-alias-state-business-primary) 10%,var(--dsw-alias-bg-layer-2,transparent));border-color:color-mix(in srgb,var(--dsw-alias-state-business-primary) 28%,var(--dsw-alias-border-l2))}.dshse_previewText{white-space:pre-wrap;word-break:break-word;color:var(--dsw-alias-label-primary);font-size:13px;line-height:1.6}.dshse_previewBubbleCollapsed .dshse_previewText{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.dshse_previewMsgTime{color:var(--dsw-alias-label-tertiary);font-size:11px}.dshse_previewSystem{display:flex;flex-wrap:nowrap;gap:6px;padding:2px 0;max-width:100%;overflow-x:auto}.dshse_previewSystemLeft{justify-content:flex-start}.dshse_previewSystemRight{justify-content:flex-end}.dshse_previewTag{display:inline-flex;align-items:center;gap:5px;flex:none;max-width:240px;min-height:20px;padding:1px 8px;border:1px solid var(--dsw-alias-border-l2);border-radius:999px;background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-secondary);font-size:11px;line-height:16px;cursor:default}.dshse_previewTag:hover{color:var(--dsw-alias-label-primary);border-color:var(--dsw-alias-label-dimmed)}.dshse_previewTagDot{flex:none;width:4px;height:4px;border-radius:50%;background:var(--dsw-alias-label-tertiary)}.dshse_previewTag:hover .dshse_previewTagDot{background:var(--dsw-alias-label-primary)}.dshse_previewTagLabel{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dshse_previewEmpty{padding:24px 8px;color:var(--dsw-alias-label-secondary);text-align:center}";
 const ARCHIVE_SETTINGS_LAYOUT_OVERRIDE = ".dshse_settings{margin:0 auto!important}@media(max-width:720px){.dshse_settings{margin:0 auto!important}}";
 if (typeof document !== "undefined" && document.querySelector("style[data-plugin-css=" + JSON.stringify("dsh-session-enhance/ArchiveSettings.layout.css") + "]") === null) {
 	const tag = document.createElement("style");
@@ -212,7 +413,8 @@ function ArchivedGroupActions({ group, busy, allArchived, onRestore, onDelete, o
 	const ungrouped = group.key === ARCHIVE_UNGROUPED_KEY;
 	const items = [{
 		id: "restore",
-		label: t(ungrouped ? "archives.restoreUngrouped" : "archives.restoreProject")
+		label: t(ungrouped ? "archives.restoreUngrouped" : "archives.restoreProject"),
+		icon: (0, react_jsx_runtime.jsx)(RestoreAllIcon, {})
 	}, {
 		id: "delete",
 		label: t(ungrouped ? "archives.deleteUngrouped" : "archives.deleteProject"),
@@ -226,7 +428,7 @@ function ArchivedGroupActions({ group, busy, allArchived, onRestore, onDelete, o
 		}, {
 			id: "deleteWorkspace",
 			label: t("delete.workspace"),
-			icon: (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconTrashOutline16, {}),
+			icon: (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconCloseFill14, { className: "dshse_redIcon" }),
 			danger: true
 		});
 	}
@@ -322,10 +524,11 @@ function sortArchivedGroups(groups, sortBy, createdAtById, t) {
 	});
 }
 /** 管理设置页中的归档会话，数据直接订阅 DSH 的会话与工作区投影。 */
-function ArchivedSessionsSection({ sessionStore, workspaceStore, unarchiveSession, deleteSession, deleteWorkspace, unarchiveSessions, deleteArchivedSessions, archivedSessionMetadata, syncRecords, listEmptyWorkspaceDirectories, deleteEmptyWorkspaceDirectory, t }) {
+function ArchivedSessionsSection({ sessionStore, workspaceStore, unarchiveSession, deleteSession, deleteWorkspace, unarchiveSessions, deleteArchivedSessions, archivedSessionMetadata, previewSession, syncRecords, listEmptyWorkspaceDirectories, deleteEmptyWorkspaceDirectory, t }) {
 	const sessions = (0, react.useSyncExternalStore)(sessionStore.subscribe, sessionStore.getSnapshot);
 	const workspaceState = (0, react.useSyncExternalStore)(workspaceStore.subscribe, workspaceStore.getSnapshot);
 	const [deleteTarget, setDeleteTarget] = (0, react.useState)(null);
+	const [preview, setPreview] = (0, react.useState)(null);
 	const [busy, setBusy] = (0, react.useState)(false);
 	const [error, setError] = (0, react.useState)(null);
 	const [notice, setNotice] = (0, react.useState)(null);
@@ -394,6 +597,19 @@ function ArchivedSessionsSection({ sessionStore, workspaceStore, unarchiveSessio
 			setError(formatUnarchiveError(reason, t));
 		});
 	};
+	/** PLUS：打开归档对话预览弹窗（读取转录消息，只读）。 */
+	const onPreview = (session) => {
+		setError(null);
+		setNotice(null);
+		setPreview({ session, messages: null, loading: true });
+		previewSession(session.id).then((result) => {
+			setPreview((current) => current !== null && current.session.id === session.id ? { session, messages: result.messages, loading: false } : current);
+		}).catch((reason) => {
+			setPreview((current) => current !== null && current.session.id === session.id ? { session, messages: null, loading: false, error: reason instanceof Error ? reason.message : String(reason) } : current);
+		});
+	};
+	const closePreview = () => setPreview(null);
+	const previewTurns = (0, react.useMemo)(() => preview !== null && Array.isArray(preview.messages) ? groupPreviewTurns(preview.messages) : [], [preview]);
 	const onBatchUnarchive = async (target) => {
 		if (busy) return;
 		setBusy(true);
@@ -499,7 +715,7 @@ function ArchivedSessionsSection({ sessionStore, workspaceStore, unarchiveSessio
 	return (0, react_jsx_runtime.jsxs)("section", {
 		className: "dshse_settings",
 		"aria-label": t("archives.title"),
-		children: [(0, react_jsx_runtime.jsx)("style", { children: ARCHIVE_SETTINGS_CSS + ARCHIVE_SETTINGS_BATCH_CSS }), (0, react_jsx_runtime.jsxs)("header", { className: "dshse_settingsHeader", children: [(0, react_jsx_runtime.jsxs)("div", { children: [(0, react_jsx_runtime.jsx)("h2", { children: t("archives.title") }), (0, react_jsx_runtime.jsx)("p", { className: "dshse_settingsIntro", children: t("archives.description") })] }), (0, react_jsx_runtime.jsxs)("div", { className: "dshse_settingsHeaderActions", children: [(0, react_jsx_runtime.jsx)("button", { type: "button", className: "dshse_settingsRestoreAll", disabled: busy, onClick: onSync, children: t("archives.sync") }), (0, react_jsx_runtime.jsx)("button", { type: "button", className: "dshse_settingsRestoreAll", disabled: busy || allBatchSessionIds.length === 0, onClick: () => onBatchUnarchive(allBatchTarget), children: t("archives.restoreAll") }), (0, react_jsx_runtime.jsxs)("button", { type: "button", className: "dshse_settingsDanger", disabled: busy || allBatchSessionIds.length === 0, onClick: () => setDeleteTarget({ kind: "batch", target: allBatchTarget, title: t("archives.allProjects"), count: allBatchSessionIds.length }), children: [(0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconTrashOutline16, {}), t("archives.deleteAll")] })] })] }), (0, react_jsx_runtime.jsxs)("div", { className: "dshse_settingsToolbar", children: [(0, react_jsx_runtime.jsxs)("label", { className: "dshse_settingsSearch", children: [(0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconSearchOutline16, {}), (0, react_jsx_runtime.jsx)("input", { type: "search", value: query, onChange: (event) => setQuery(event.target.value), placeholder: t("archives.searchPlaceholder"), "aria-label": t("archives.searchPlaceholder") })] }), (0, react_jsx_runtime.jsx)(ArchiveProjectSelect, { id: "dshse-sort-filter", value: sortBy, options: [{ value: "updated", label: t("archives.sortUpdated") }, { value: "created", label: t("archives.sortCreated") }, { value: "alphabetical", label: t("archives.sortAlphabetical") }], onChange: setSortBy, "aria-label": t("archives.sortBy") }), (0, react_jsx_runtime.jsx)(ArchiveProjectSelect, { id: "dshse-project-filter", value: project, options: [{ value: "all", label: t("archives.allProjects") }, ...sortedGroups.map((group) => ({ value: group.key, label: group.title }))], onChange: setProject, "aria-label": t("archives.projectFilter") })] }), groups.length === 0 ? emptyDirs.length === 0 ? (0, react_jsx_runtime.jsx)("div", { className: "dshse_settingsEmpty", children: t("archives.empty") }) : null : filteredGroups.length === 0 ? (0, react_jsx_runtime.jsx)("div", { className: "dshse_settingsEmpty", children: t("archives.emptyFiltered") }) : filteredGroups.map((group) => {
+		children: [(0, react_jsx_runtime.jsx)("style", { children: ARCHIVE_SETTINGS_CSS + ARCHIVE_SETTINGS_BATCH_CSS + ARCHIVE_PREVIEW_CSS }), (0, react_jsx_runtime.jsxs)("header", { className: "dshse_settingsHeader", children: [(0, react_jsx_runtime.jsxs)("div", { children: [(0, react_jsx_runtime.jsx)("h2", { children: t("archives.title") }), (0, react_jsx_runtime.jsx)("p", { className: "dshse_settingsIntro", children: t("archives.description") })] }), (0, react_jsx_runtime.jsxs)("div", { className: "dshse_settingsHeaderActions", children: [(0, react_jsx_runtime.jsx)("button", { type: "button", className: "dshse_settingsRestoreAll", disabled: busy, onClick: onSync, children: t("archives.sync") }), (0, react_jsx_runtime.jsx)("button", { type: "button", className: "dshse_settingsRestoreAll", disabled: busy || allBatchSessionIds.length === 0, onClick: () => onBatchUnarchive(allBatchTarget), children: t("archives.restoreAll") }), (0, react_jsx_runtime.jsxs)("button", { type: "button", className: "dshse_settingsDanger", disabled: busy || allBatchSessionIds.length === 0, onClick: () => setDeleteTarget({ kind: "batch", target: allBatchTarget, title: t("archives.allProjects"), count: allBatchSessionIds.length }), children: [(0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconTrashOutline16, {}), t("archives.deleteAll")] })] })] }), (0, react_jsx_runtime.jsxs)("div", { className: "dshse_settingsToolbar", children: [(0, react_jsx_runtime.jsxs)("label", { className: "dshse_settingsSearch", children: [(0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconSearchOutline16, {}), (0, react_jsx_runtime.jsx)("input", { type: "search", value: query, onChange: (event) => setQuery(event.target.value), placeholder: t("archives.searchPlaceholder"), "aria-label": t("archives.searchPlaceholder") })] }), (0, react_jsx_runtime.jsx)(ArchiveProjectSelect, { id: "dshse-sort-filter", value: sortBy, options: [{ value: "updated", label: t("archives.sortUpdated") }, { value: "created", label: t("archives.sortCreated") }, { value: "alphabetical", label: t("archives.sortAlphabetical") }], onChange: setSortBy, "aria-label": t("archives.sortBy") }), (0, react_jsx_runtime.jsx)(ArchiveProjectSelect, { id: "dshse-project-filter", value: project, options: [{ value: "all", label: t("archives.allProjects") }, ...sortedGroups.map((group) => ({ value: group.key, label: group.title }))], onChange: setProject, "aria-label": t("archives.projectFilter") })] }), groups.length === 0 ? emptyDirs.length === 0 ? (0, react_jsx_runtime.jsx)("div", { className: "dshse_settingsEmpty", children: t("archives.empty") }) : null : filteredGroups.length === 0 ? (0, react_jsx_runtime.jsx)("div", { className: "dshse_settingsEmpty", children: t("archives.emptyFiltered") }) : filteredGroups.map((group) => {
 			const target = archivedBatchTargetForGroup(group.key);
 			const count = deriveArchivedBatchIds(workspaceState.archivedSessionIds, workspaceState.items, target).length;
 			const workspace = group.key === ARCHIVE_UNGROUPED_KEY ? void 0 : workspaceState.items.find((item) => item.workspaceId === group.key);
@@ -512,7 +728,7 @@ function ArchivedSessionsSection({ sessionStore, workspaceStore, unarchiveSessio
 						className: "dshse_settingsRow",
 						children: [(0, react_jsx_runtime.jsxs)("div", { className: "dshse_settingsContent", children: [(0, react_jsx_runtime.jsx)("div", { className: "dshse_settingsTitle", children: displayTitle(session, t) }), (0, react_jsx_runtime.jsx)("div", { className: "dshse_settingsMeta", children: archiveTimeLabel(session.updatedAt, t) })] }), (0, react_jsx_runtime.jsxs)("div", {
 							className: "dshse_settingsActions",
-							children: [(0, react_jsx_runtime.jsx)("button", { type: "button", className: "dshse_settingsAction", disabled: busy, onClick: () => onUnarchive(session.id), children: t("menu.unarchive") }), (0, react_jsx_runtime.jsx)("button", { type: "button", className: "dshse_settingsDelete", disabled: busy, "aria-label": t("menu.deleteSession"), onClick: () => setDeleteTarget({ kind: "session", session }), children: (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconTrashOutline16, {}) })]
+							children: [(0, react_jsx_runtime.jsx)("button", { type: "button", className: "dshse_settingsIconButton", disabled: busy, "aria-label": t("archives.previewSession"), title: t("archives.previewSession"), onClick: () => onPreview(session), children: (0, react_jsx_runtime.jsx)(EyeIcon, {}) }), (0, react_jsx_runtime.jsx)("button", { type: "button", className: "dshse_settingsIconButton", disabled: busy, "aria-label": t("menu.unarchive"), title: t("menu.unarchive"), onClick: () => onUnarchive(session.id), children: (0, react_jsx_runtime.jsx)(RestoreIcon, {}) }), (0, react_jsx_runtime.jsx)("button", { type: "button", className: "dshse_settingsDelete", disabled: busy, "aria-label": t("menu.deleteSession"), onClick: () => setDeleteTarget({ kind: "session", session }), children: (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconTrashOutline16, {}) })]
 						})]
 					}, session.id))
 				})]
@@ -537,6 +753,16 @@ function ArchivedSessionsSection({ sessionStore, workspaceStore, unarchiveSessio
 			...deleteDialogDescription === void 0 ? {} : { description: deleteDialogDescription },
 			footer: (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [(0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, { variant: "outline", disabled: busy, onClick: closeDelete, children: t("cancel") }), (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, { variant: "outline", disabled: busy, onClick: confirmDelete, children: deleteConfirmLabel })] }),
 			children: busy && (0, react_jsx_runtime.jsx)("div", { role: "status", children: deleteTarget?.kind === "workspace" ? t("delete.pending") : deleteTarget?.kind === "workspaceDir" ? t("archives.emptyDirDeletePending") : deleteTarget?.kind === "batch" ? t("archives.deleteBatchPending") : t("deleteSession.pending") })
+		}), (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Modal, {
+			open: preview !== null,
+			onClose: closePreview,
+			closeLabel: t("close"),
+			title: preview === null ? "" : displayTitle(preview.session, t),
+			className: "dshse_previewModal",
+			children: (0, react_jsx_runtime.jsx)("div", {
+				className: "dshse_previewBody",
+				children: preview === null ? null : preview.loading ? (0, react_jsx_runtime.jsx)("div", { className: "dshse_previewEmpty", role: "status", children: t("archives.previewLoading") }) : preview.error !== void 0 ? (0, react_jsx_runtime.jsx)("div", { className: "dshse_settingsError", role: "alert", children: t("archives.previewFailed", { detail: preview.error }) }) : previewTurns.length === 0 ? (0, react_jsx_runtime.jsx)("div", { className: "dshse_previewEmpty", children: t("archives.previewEmpty") }) : previewTurns.map((turn, index) => (0, react_jsx_runtime.jsx)(PreviewTurn, { turn, t }, index))
+			})
 		})]
 	});
 }
