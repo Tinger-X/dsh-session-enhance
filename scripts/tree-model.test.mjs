@@ -73,3 +73,45 @@ test("buildTree projects forks from detached branch segments", () => {
 	assert.equal(altFork.options[1].branchId, "b2");
 	assert.equal(altFork.options[1].active, true);
 });
+
+test("buildTree structure stays fixed across an active-branch switch (only highlight moves)", () => {
+	// root 活动：主干 = A1,A2；b2 在 depth 1 分叉，游离段 = B2。
+	const activeEvents = [...makeTurn(1, "A1", 0), ...makeTurn(2, "A2", 4)];
+	const sidecarRootActive = {
+		version: 1,
+		sessionId: "s1",
+		activeBranchId: "root",
+		branches: [
+			{ id: "root", parentBranchId: null, forkDepth: 0, name: "主分支", createdAt: 0 },
+			{ id: "b2", parentBranchId: "root", forkDepth: 1, name: "分支 2", createdAt: 1 }
+		],
+		detached: [{ branchId: "b2", events: makeTurn(2, "B2", 4), createdAt: 1 }]
+	};
+	const rootTree = buildTree(activeEvents, sidecarRootActive);
+
+	// b2 活动：主干 = root 的 turn 1（共享前缀）+ b2 的 turn 2；root 退为游离段（全长 root 事件）。
+	const b2TrunkEvents = [...makeTurn(1, "A1", 0), ...makeTurn(2, "B2", 4)];
+	const sidecarB2Active = {
+		version: 1,
+		sessionId: "s1",
+		activeBranchId: "b2",
+		branches: [
+			{ id: "root", parentBranchId: null, forkDepth: 0, name: "主分支", createdAt: 0 },
+			{ id: "b2", parentBranchId: "root", forkDepth: 1, name: "分支 2", createdAt: 1 }
+		],
+		detached: [{ branchId: "root", events: [...makeTurn(1, "A1", 0), ...makeTurn(2, "A2", 4)], createdAt: 0 }]
+	};
+	const b2Tree = buildTree(b2TrunkEvents, sidecarB2Active);
+
+	// 节点集合稳定：同样的 id（含 branchId 归属），同样的 parentId 拓扑。
+	// （数组顺序不参与比较——渲染按 branchId 列 + depth 定位，与 nodes 顺序无关。）
+	const rootById = new Map(rootTree.nodes.map((n) => [`${n.id}@${n.branchId}`, n.parentId]));
+	const b2ById = new Map(b2Tree.nodes.map((n) => [`${n.id}@${n.branchId}`, n.parentId]));
+	assert.deepEqual([...rootById.keys()].sort(), [...b2ById.keys()].sort(), "node set + branch ownership must be identical across active-branch switch");
+	assert.deepEqual(rootById, b2ById, "node topology (parentId) must be identical across switch");
+
+	// 仅活动路径（高亮）改变。
+	assert.deepEqual(rootTree.activePath, ["root:1", "root:2"], "root-active highlight on root path");
+	assert.deepEqual(b2Tree.activePath, ["root:1", "b2:2"], "b2-active highlight crosses onto b2");
+});
+

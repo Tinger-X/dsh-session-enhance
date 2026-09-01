@@ -275,11 +275,9 @@ export function installConversationTree(ctx, api) {
 
 	function computeColumns(tree) {
 		const columns = new Map();
-		const active = tree.activeBranchId ?? "root";
-		columns.set(active, 0);
-		let next = 1;
+		let next = 0;
+		// 按分支创建顺序（root 优先）稳定分配列；切换活动分支时列位不变，树结构恒定。
 		for (const branch of tree.branches ?? []) {
-			if (branch.id === active) continue;
 			if (!columns.has(branch.id)) columns.set(branch.id, next++);
 		}
 		return columns;
