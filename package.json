@@ -28,7 +28,8 @@
     "build:client": "node scripts/build-client.mjs",
     "test": "node --test scripts/*.test.mjs",
     "pack:check": "pnpm pack --dry-run",
-    "prepublishOnly": "pnpm build && pnpm test"
+    "prepublishOnly": "pnpm build && pnpm test",
+    "update:se": "dsh plugin --profile web remove dsh-session-enhance && pnpm build:client && dsh plugin --profile web add ."
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "4.0.1",

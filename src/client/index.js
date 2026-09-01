@@ -4,6 +4,7 @@ import { zh, en } from "./locales.js";
 import { EnhancementSection, installEnhanceNavIconSwap, installConversationNotifier, deriveArchivedGroups, sortArchivedGroups, deriveArchivedBatchIds } from "./settings.js";
 import { WorkspaceBrowser } from "./workspace-browser.js";
 import { WorkspacePicker } from "./workspace-picker.js";
+import { installConversationTree } from "./tree.js";
 import { displayTitle } from "./rows.js";
 import { sessionVisible, isUnknownSessionError, deriveGroups, deriveFlat, deriveSearchResults, groupByWorkspace, byRecency } from "./derive.js";
 
@@ -187,8 +188,36 @@ function applyWorkspaceBrowser(ctx) {
 		if (!result.ok) throw new Error(result.error.message);
 		return result.value;
 	};
+	/** PLUS：对话树远程方法（读取树 / 重新生成 / 编辑重生成 / 切换分支）。 */
+	const treeRegistry = () => {
+		const registry = ctx.get("remote.workspaceRegistry");
+		if (registry === void 0) throw new Error("dsh-session-enhance remote service is unavailable");
+		return registry;
+	};
+	const readTree = async (sessionId) => {
+		const result = await treeRegistry().readTree(sessionId);
+		if (!result.ok) throw new Error(result.error.message);
+		return result.value;
+	};
+	const regenerate = async (sessionId, nodeId) => {
+		const result = await treeRegistry().regenerate(sessionId, nodeId);
+		if (!result.ok) throw new Error(result.error.message);
+		return result.value;
+	};
+	const editAndRegenerate = async (sessionId, nodeId, text) => {
+		const result = await treeRegistry().editAndRegenerate(sessionId, nodeId, text);
+		if (!result.ok) throw new Error(result.error.message);
+		return result.value;
+	};
+	const switchBranch = async (sessionId, branchId) => {
+		const result = await treeRegistry().switchBranch(sessionId, branchId);
+		if (!result.ok) throw new Error(result.error.message);
+		return result.value;
+	};
 	// PLUS：对话通知（对话结束/需要操作时，未聚焦且启用通知则弹出系统提示）。
 	ctx.effect(() => installConversationNotifier(ctx, getSettings, ctx.locale.bind(NS)), "dsh-session-enhance: conversation notifier");
+	// PLUS：对话树（左侧树形面板 + 分支切换 + 编辑/重新生成）。
+	ctx.effect(() => installConversationTree(ctx, { readTree, regenerate, editAndRegenerate, switchBranch, t: ctx.locale.bind(NS) }), "dsh-session-enhance: conversation tree");
 	const browserInjected = () => ({
 		startSession: (workspaceId) => {
 			ctx.workspaces.startSession(workspaceId);

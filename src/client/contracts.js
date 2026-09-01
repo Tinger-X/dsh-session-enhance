@@ -107,6 +107,43 @@ const settingsUpdateSchema = {
 		return value;
 	}
 };
+const nodeIdSchema = {
+	parse(value) {
+		if (typeof value !== "string" || value.length === 0) throw new TypeError(`nodeId must be a non-empty string, got ${String(value)}`);
+		return value;
+	}
+};
+const branchIdSchema = {
+	parse(value) {
+		if (typeof value !== "string" || value.length === 0) throw new TypeError(`branchId must be a non-empty string, got ${String(value)}`);
+		return value;
+	}
+};
+const optionalTextSchema = {
+	parse(value) {
+		if (value === void 0 || value === null) return null;
+		if (typeof value !== "string") throw new TypeError("text must be a string");
+		return value;
+	}
+};
+const treeSnapshotSchema = {
+	parse(value) {
+		if (typeof value !== "object" || value === null || Array.isArray(value)) throw new TypeError("tree snapshot must be an object");
+		if (!Array.isArray(value.nodes)) throw new TypeError("tree.nodes must be an array");
+		if (!Array.isArray(value.activePath)) throw new TypeError("tree.activePath must be an array");
+		if (!Array.isArray(value.branches)) throw new TypeError("tree.branches must be an array");
+		if (typeof value.activeBranchId !== "string") throw new TypeError("tree.activeBranchId must be a string");
+		return value;
+	}
+};
+const treeActionResultSchema = {
+	parse(value) {
+		if (typeof value !== "object" || value === null || Array.isArray(value)) throw new TypeError("tree result must be an object");
+		if (typeof value.sessionId !== "string" || value.sessionId.length === 0) throw new TypeError("tree result sessionId must be a non-empty string");
+		if (typeof value.branchId !== "string" || value.branchId.length === 0) throw new TypeError("tree result branchId must be a non-empty string");
+		return value;
+	}
+};
 const SESSION_ENHANCE_REMOTE = {
 	package: "dsh-session-enhance",
 	descriptors: [
@@ -268,6 +305,102 @@ const SESSION_ENHANCE_REMOTE = {
 				mode: "strict",
 				typeSymbol: "dsh-session-enhance/types#Settings",
 				schema: settingsSchema
+			},
+			sourceLocation: { file: "dsh-session-enhance/lib/workspace.js", line: 1, column: 1 }
+		},
+		{
+			id: "dsh-session-enhance#workspaceRegistry/readTree",
+			service: "workspaceRegistry",
+			namespace: "workspaceRegistry",
+			method: "readTree",
+			invocation: { kind: "direct" },
+			parameters: [{
+				name: "sessionId",
+				wire: "sessionId",
+				source: "json",
+				codec: { mode: "strict", typeSymbol: "@deepseek-ai/dsh-session/types#SessionId", schema: sessionIdSchema }
+			}],
+			result: {
+				mode: "strict",
+				typeSymbol: "dsh-session-enhance/types#TreeSnapshot",
+				schema: treeSnapshotSchema
+			},
+			sourceLocation: { file: "dsh-session-enhance/lib/workspace.js", line: 1, column: 1 }
+		},
+		{
+			id: "dsh-session-enhance#workspaceRegistry/regenerate",
+			service: "workspaceRegistry",
+			namespace: "workspaceRegistry",
+			method: "regenerate",
+			invocation: { kind: "direct" },
+			parameters: [{
+				name: "sessionId",
+				wire: "sessionId",
+				source: "json",
+				codec: { mode: "strict", typeSymbol: "@deepseek-ai/dsh-session/types#SessionId", schema: sessionIdSchema }
+			}, {
+				name: "nodeId",
+				wire: "nodeId",
+				source: "json",
+				codec: { mode: "strict", typeSymbol: "dsh-session-enhance/types#NodeId", schema: nodeIdSchema }
+			}],
+			result: {
+				mode: "strict",
+				typeSymbol: "dsh-session-enhance/types#TreeActionResult",
+				schema: treeActionResultSchema
+			},
+			sourceLocation: { file: "dsh-session-enhance/lib/workspace.js", line: 1, column: 1 }
+		},
+		{
+			id: "dsh-session-enhance#workspaceRegistry/editAndRegenerate",
+			service: "workspaceRegistry",
+			namespace: "workspaceRegistry",
+			method: "editAndRegenerate",
+			invocation: { kind: "direct" },
+			parameters: [{
+				name: "sessionId",
+				wire: "sessionId",
+				source: "json",
+				codec: { mode: "strict", typeSymbol: "@deepseek-ai/dsh-session/types#SessionId", schema: sessionIdSchema }
+			}, {
+				name: "nodeId",
+				wire: "nodeId",
+				source: "json",
+				codec: { mode: "strict", typeSymbol: "dsh-session-enhance/types#NodeId", schema: nodeIdSchema }
+			}, {
+				name: "text",
+				wire: "text",
+				source: "json",
+				codec: { mode: "strict", typeSymbol: "dsh-session-enhance/types#OptionalText", schema: optionalTextSchema }
+			}],
+			result: {
+				mode: "strict",
+				typeSymbol: "dsh-session-enhance/types#TreeActionResult",
+				schema: treeActionResultSchema
+			},
+			sourceLocation: { file: "dsh-session-enhance/lib/workspace.js", line: 1, column: 1 }
+		},
+		{
+			id: "dsh-session-enhance#workspaceRegistry/switchBranch",
+			service: "workspaceRegistry",
+			namespace: "workspaceRegistry",
+			method: "switchBranch",
+			invocation: { kind: "direct" },
+			parameters: [{
+				name: "sessionId",
+				wire: "sessionId",
+				source: "json",
+				codec: { mode: "strict", typeSymbol: "@deepseek-ai/dsh-session/types#SessionId", schema: sessionIdSchema }
+			}, {
+				name: "branchId",
+				wire: "branchId",
+				source: "json",
+				codec: { mode: "strict", typeSymbol: "dsh-session-enhance/types#BranchId", schema: branchIdSchema }
+			}],
+			result: {
+				mode: "strict",
+				typeSymbol: "dsh-session-enhance/types#TreeActionResult",
+				schema: treeActionResultSchema
 			},
 			sourceLocation: { file: "dsh-session-enhance/lib/workspace.js", line: 1, column: 1 }
 		}

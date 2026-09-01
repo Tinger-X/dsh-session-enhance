@@ -141,7 +141,13 @@ const zh = {
 	"time.days": "{n}天",
 	"time.months": "{n}个月",
 	"time.years": "{n}年",
-	"time.ago": "{t}前"
+	"time.ago": "{t}前",
+	"tree.title": "对话树",
+	"tree.regenerate": "重新生成",
+	"tree.edit": "修改",
+	"tree.editSave": "保存并重新生成",
+	"tree.editSend": "发送",
+	"tree.editCancel": "取消"
 };
 /** English dictionary, checked complete against the zh key set. */
 const en = {
@@ -281,7 +287,13 @@ const en = {
 	"time.days": "{n}d",
 	"time.months": "{n}mo",
 	"time.years": "{n}y",
-	"time.ago": "{t} ago"
+	"time.ago": "{t} ago",
+	"tree.title": "Conversation tree",
+	"tree.regenerate": "Regenerate",
+	"tree.edit": "Edit",
+	"tree.editSave": "Save & regenerate",
+	"tree.editSend": "Send",
+	"tree.editCancel": "Cancel"
 };
 
 export { zh, en };
