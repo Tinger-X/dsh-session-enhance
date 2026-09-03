@@ -648,7 +648,7 @@ export function installConversationTree(ctx, api) {
 			await api.switchBranch(sid, branchId);
 			tree = null;
 			await load();
-			resync(sid);
+			await resync(sid);
 		} catch (error) {
 			console.warn("[dsh-session-enhance] switchBranch failed:", error);
 		}
@@ -661,14 +661,28 @@ export function installConversationTree(ctx, api) {
 			await api.regenerate(sid, node.id);
 			tree = null;
 			await load();
-			resync(sid);
+			await resync(sid);
 		} catch (error) {
 			console.warn("[dsh-session-enhance] regenerate failed:", error);
 		}
 	}
 
-	/** 分支操作会改写主干并 detach live 会话，这里尽力重新打开让聊天区刷新。 */
-	function resync(sid) {
+	/** 分支操作改写了主干工件与宿主实时会话 log，但客户端会话镜像
+	 *  （dsh-client-runtime 的 Session）持有各自拉取的旧窗口事件，且不会被
+	 *  通知重拉——`ctx.sessions.open(sid)` 对已当前的会话是 no-op（select 不重拉
+	 *  窗口）。直接调用客户端镜像的 `resync()`：重置窗口并重拉历史，让聊天区
+	 *  呈现新分支内容。`binding(sid).session` 与本文件 watchSessionInstance 同一
+	 *  访问路径；resync 不可用时回退到 open。 */
+	async function resync(sid) {
+		try {
+			const inst = ctx.sessions?.binding?.(sid)?.session;
+			if (inst !== void 0 && typeof inst.resync === "function") {
+				await inst.resync();
+				return;
+			}
+		} catch (error) {
+			console.warn("[dsh-session-enhance] resync session window after branch operation failed:", error);
+		}
 		try {
 			ctx.sessions?.open?.(sid);
 		} catch (error) {
