@@ -7,25 +7,27 @@
  * - 滚动口：`[data-conversation-scroll]`
  * - 输入区：`[data-slot="conversation.composer"]`（回退 `[data-composer-card]` / `[data-composer-seat]`）
  *
- * 面板挂在会话中栏内（absolute），顶部对齐 header 底、底部对齐输入区顶、贴左缘。
+ * 面板挂在会话中栏内（fixed），顶部对齐 header 底、底部对齐输入区顶，水平居中于中栏。
  * 默认仅渲染节点（圆点），悬浮显示文本概览；节点按深度竖直、按分支横向错位，并用
- * SVG 连线呈现树结构。重新生成 / 编辑重生成注入到聊天区消息操作栏。
+ * 平滑贝塞尔曲线连线呈现树结构，连线与圆点按分支着色（跨列连线渐变过渡）。
  */
 
 const CSS_ID = "dsh-session-enhance/tree.module.css";
 const CSS = [
-	".dshct_panel{position:fixed;z-index:200;display:flex;flex-direction:column;overflow:hidden;pointer-events:none}",
+	// 面板级分支调色板：前三个取主题 accent（跟随明暗主题），其余为明暗底均可见的中饱和度固定色。
+	".dshct_panel{position:fixed;z-index:200;display:flex;flex-direction:column;overflow:hidden;pointer-events:none;--dshct-palette-0:var(--dsw-alias-brand-primary,#4e7cff);--dshct-palette-1:var(--dsw-alias-state-business-primary,#10b981);--dshct-palette-2:var(--dsw-alias-accent-strong,#8b5cf6);--dshct-palette-3:#f59e0b;--dshct-palette-4:#ec4899;--dshct-palette-5:#14b8a6}",
 	".dshct_scroll{position:relative;flex:1 1 auto;overflow-y:auto;overflow-x:hidden;pointer-events:auto;scrollbar-width:none}",
 	".dshct_scroll::-webkit-scrollbar{display:none}",
 	".dshct_content{position:relative}",
 	".dshct_edges{position:absolute;left:0;top:0;overflow:visible;pointer-events:none}",
-	".dshct_edge{fill:none;stroke:var(--dsw-alias-label-caption,#c9cdd4);stroke-width:1.4;opacity:.55}",
+	".dshct_edge{fill:none;stroke:var(--dsw-alias-label-caption,#c9cdd4);stroke-width:1.6;stroke-linecap:round;opacity:.38;transition:opacity .15s,stroke-width .15s}",
+	".dshct_edge[data-active]{stroke-width:2.1;opacity:.95}",
 	".dshct_node{position:absolute;display:flex;align-items:center;gap:4px;white-space:nowrap;cursor:pointer}",
-	".dshct_dot{width:10px;height:10px;border-radius:50%;background:var(--dsw-alias-label-caption,#c0c4cc);border:2px solid transparent;box-sizing:border-box;transition:transform .12s,background .12s,box-shadow .12s,border-color .12s}",
+	".dshct_dot{width:10px;height:10px;border-radius:50%;background:var(--dsw-alias-bg-layer-2,#fff);border:2px solid var(--dshct-branch-color,var(--dsw-alias-label-caption,#c0c4cc));box-sizing:border-box;transition:transform .12s,background .12s,box-shadow .12s,border-color .12s}",
 	".dshct_node:hover .dshct_dot{transform:scale(1.35)}",
-	".dshct_node[data-active] .dshct_dot{background:var(--dsw-alias-brand-primary,#3b82f6);box-shadow:0 0 0 3px color-mix(in srgb,var(--dsw-alias-brand-primary,#3b82f6) 22%,transparent)}",
+	".dshct_node[data-fork]:not([data-active]) .dshct_dot{box-shadow:0 0 0 2.5px color-mix(in srgb,var(--dshct-branch-color,var(--dsw-alias-label-caption,#c0c4cc)) 18%,transparent)}",
+	".dshct_node[data-active] .dshct_dot{background:var(--dshct-branch-color,var(--dsw-alias-brand-primary,#3b82f6));border-color:transparent;box-shadow:0 0 0 3.5px color-mix(in srgb,var(--dshct-branch-color,var(--dsw-alias-brand-primary,#3b82f6)) 20%,transparent)}",
 	".dshct_node[data-faded] .dshct_dot{opacity:.45}",
-	".dshct_node[data-fork] .dshct_dot{border-color:var(--dsw-alias-label-secondary,#61666b)}",
 	".dshct_branch{display:inline-flex;align-items:center;gap:3px;font-size:11px;color:var(--dsw-alias-label-secondary,#61666b);background:var(--dsw-alias-bg-layer-2,#fff);border:1px solid var(--dsw-alias-border-l2,rgba(0,0,0,.1));border-radius:7px;padding:1px 3px;box-shadow:var(--dsw-shadow-lv1,0 2px 8px rgba(0,0,0,.08))}",
 	".dshct_branch button{background:none;border:none;color:inherit;cursor:pointer;border-radius:5px;padding:0 5px;height:18px;line-height:16px}",
 	".dshct_branch button:hover{background:var(--dsw-alias-interactive-bg-hover,rgba(0,0,0,.06))}",
@@ -46,6 +48,11 @@ const PAD_LEFT = 10;
 const PAD_TOP = 10;
 const DOT_SIZE = 10;
 const DOT_R = DOT_SIZE / 2;
+const PANEL_MAX_WIDTH = 220;
+
+/** 分支调色板：与 .dshct_panel 上的 --dshct-palette-N 变量一一对应，按分支列序循环取色。 */
+const BRANCH_COLOR_VARS = ["--dshct-palette-0", "--dshct-palette-1", "--dshct-palette-2", "--dshct-palette-3", "--dshct-palette-4", "--dshct-palette-5"];
+const BRANCH_COLOR_FALLBACK = ["#4e7cff", "#10b981", "#8b5cf6", "#f59e0b", "#ec4899", "#14b8a6"];
 
 const EDIT_ICON = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11.3 2.3a1.8 1.8 0 0 1 2.6 2.6L6.3 12.5 2.8 13.2l.7-3.5 7.8-7.4z"/></svg>';
 const REGEN_ICON = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>';
@@ -100,6 +107,27 @@ export function installConversationTree(ctx, api) {
 	let actionTip = null;
 	let resizeObserver = null;
 	let observedTargets = null;
+	let paletteCache = null;
+
+	/** 解析面板上的分支调色板（alias 变量在面板上下文中求值，跟随主题）。 */
+	function branchPalette() {
+		if (paletteCache !== null) return paletteCache;
+		const cs = panel !== null && panel.isConnected ? window.getComputedStyle(panel) : null;
+		paletteCache = BRANCH_COLOR_VARS.map((name, index) => {
+			const value = cs !== null ? (cs.getPropertyValue(name) || "").trim() : "";
+			return value !== "" ? value : BRANCH_COLOR_FALLBACK[index];
+		});
+		return paletteCache;
+	}
+
+	function branchColor(columns, branchId) {
+		return colorForColumn(columns.get(branchId) ?? 0);
+	}
+
+	function colorForColumn(column) {
+		const palette = branchPalette();
+		return palette[column % palette.length];
+	}
 
 	function showActionTip(text, anchor) {
 		hideActionTip();
@@ -186,35 +214,46 @@ export function installConversationTree(ctx, api) {
 		return (tree.nodes ?? []).filter((node) => active.has(node.id)).sort((a, b) => a.depth - b.depth);
 	}
 
+	/** 面板宽度（无树时为 0）；居中定位需要，与 render 保持同一算法。 */
+	function panelWidth() {
+		if (tree === null || !Array.isArray(tree.nodes) || tree.nodes.length === 0) return 0;
+		return Math.min(layoutNodes(tree).width, PANEL_MAX_WIDTH);
+	}
+
 	function layoutPanel() {
 		if (panel === null || !panel.isConnected) return;
 		const anchors = findAnchors();
 		const { conv, scrollport, header, composer } = anchors;
-		let left = 0;
+		let box = null; // 水平居中的参照矩形（会话中栏/滚动口）
 		let top = 0;
 		let bottom = 0;
 		if (scrollport !== null) {
 			const rect = scrollport.getBoundingClientRect();
-			left = rect.left + 6;
+			box = rect;
 			top = rect.top;
 			bottom = Math.max(0, window.innerHeight - rect.bottom);
 		} else if (header !== null && composer !== null) {
-			left = (conv !== null ? conv.getBoundingClientRect().left : header.getBoundingClientRect().left) + 6;
+			box = (conv !== null ? conv : header).getBoundingClientRect();
 			top = header.getBoundingClientRect().bottom + 4;
 			bottom = Math.max(0, window.innerHeight - composer.getBoundingClientRect().top + 4);
 		} else if (conv !== null) {
-			const rect = conv.getBoundingClientRect();
-			left = rect.left + 6;
-			top = rect.top;
+			box = conv.getBoundingClientRect();
+			top = box.top;
 			bottom = 0;
 		} else {
 			return;
 		}
+		// 水平居中于参照矩形；宽度超出时回退为贴左缘。
+		const width = panelWidth();
+		const minLeft = box.left + 4;
+		let left = box.left + (box.width - width) / 2;
+		if (left < minLeft) left = minLeft;
+		left = Math.min(left, Math.max(minLeft, box.right - width - 4));
 		panel.style.position = "fixed";
 		panel.style.left = `${left}px`;
 		panel.style.top = `${top}px`;
 		panel.style.bottom = `${bottom}px`;
-		panel.style.width = "auto";
+		panel.style.width = `${width}px`;
 	}
 
 	function removePanel() {
@@ -227,6 +266,7 @@ export function installConversationTree(ctx, api) {
 		panel = null;
 		scrollEl = null;
 		contentEl = null;
+		paletteCache = null;
 		// 保留 tree 缓存：切回「对话」视图时可立即渲染，无需等 debounced load。
 		hideTooltip();
 		hideActionTip();
@@ -302,25 +342,34 @@ export function installConversationTree(ctx, api) {
 		return { columns, positions, width, height, maxDepth };
 	}
 
-	/** 生成节点连线（同列竖直；跨列用直角肘）。 */
-	function buildEdges(tree, positions) {
+	/** 生成节点连线：同列竖直直线；跨列用三次贝塞尔曲线平滑过渡。
+	 *  颜色取子节点分支色（跨列渐变由父色过渡到子色），并标记是否在活动路径上。 */
+	function buildEdges(tree, layout, activeSet) {
 		const byId = new Map((tree.nodes ?? []).map((node) => [node.id, node]));
+		const colorOf = (node) => branchColor(layout.columns, node.branchId);
 		const edges = [];
 		for (const node of tree.nodes ?? []) {
 			if (node.parentId === null || node.parentId === void 0) continue;
 			const parent = byId.get(node.parentId);
 			if (parent === void 0) continue;
-			const from = positions.get(parent.id);
-			const to = positions.get(node.id);
+			const from = layout.positions.get(parent.id);
+			const to = layout.positions.get(node.id);
 			if (from === void 0 || to === void 0) continue;
 			let path;
 			if (from.x === to.x) {
 				path = `M ${from.x} ${from.y + DOT_R} L ${to.x} ${to.y - DOT_R}`;
 			} else {
-				const midY = to.y - ROW_GAP / 2;
-				path = `M ${from.x} ${from.y + DOT_R} L ${from.x} ${midY} L ${to.x} ${midY} L ${to.x} ${to.y - DOT_R}`;
+				const midY = (from.y + to.y) / 2;
+				path = `M ${from.x} ${from.y + DOT_R} C ${from.x} ${midY}, ${to.x} ${midY}, ${to.x} ${to.y - DOT_R}`;
 			}
-			edges.push(path);
+			edges.push({
+				path,
+				from,
+				to,
+				fromColor: colorOf(parent),
+				toColor: colorOf(node),
+				active: activeSet.has(parent.id) && activeSet.has(node.id),
+			});
 		}
 		return edges;
 	}
@@ -333,6 +382,7 @@ export function installConversationTree(ctx, api) {
 		if (bp !== void 0) row.setAttribute("data-fork", "");
 		row.dataset.nodeId = node.id;
 		row.dataset.branchId = node.branchId;
+		row.style.setProperty("--dshct-branch-color", colorForColumn(column));
 		row.style.left = `${position.x - DOT_R}px`;
 		row.style.top = `${position.y - DOT_R}px`;
 
@@ -362,9 +412,10 @@ export function installConversationTree(ctx, api) {
 		contentEl.style.width = `${layout.width}px`;
 		contentEl.style.height = `${layout.height}px`;
 		scrollEl.appendChild(contentEl);
-		panel.style.width = `${Math.min(layout.width, 220)}px`;
+		panel.style.width = `${panelWidth()}px`;
 
-		const edges = buildEdges(tree, layout.positions);
+		const active = new Set(tree.activePath ?? []);
+		const edges = buildEdges(tree, layout, active);
 		if (edges.length > 0) {
 			const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
 			svg.setAttribute("class", "dshct_edges");
@@ -372,16 +423,41 @@ export function installConversationTree(ctx, api) {
 			svg.setAttribute("height", layout.height);
 			svg.style.width = `${layout.width}px`;
 			svg.style.height = `${layout.height}px`;
-			for (const path of edges) {
+			const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+			edges.forEach((edge, index) => {
 				const p = document.createElementNS("http://www.w3.org/2000/svg", "path");
-				p.setAttribute("d", path);
+				p.setAttribute("d", edge.path);
 				p.setAttribute("class", "dshct_edge");
+				if (edge.active) p.setAttribute("data-active", "");
+				if (edge.fromColor === edge.toColor) {
+					p.style.stroke = edge.fromColor;
+				} else {
+					// 跨列连线用父色→子色的线性渐变，颜色过渡与曲线走向一致。
+					const gradient = document.createElementNS("http://www.w3.org/2000/svg", "linearGradient");
+					const gid = `dshct_eg_${index}`;
+					gradient.setAttribute("id", gid);
+					gradient.setAttribute("gradientUnits", "userSpaceOnUse");
+					gradient.setAttribute("x1", edge.from.x);
+					gradient.setAttribute("y1", edge.from.y);
+					gradient.setAttribute("x2", edge.to.x);
+					gradient.setAttribute("y2", edge.to.y);
+					const stopStart = document.createElementNS("http://www.w3.org/2000/svg", "stop");
+					stopStart.setAttribute("offset", "0");
+					stopStart.style.stopColor = edge.fromColor;
+					const stopEnd = document.createElementNS("http://www.w3.org/2000/svg", "stop");
+					stopEnd.setAttribute("offset", "1");
+					stopEnd.style.stopColor = edge.toColor;
+					gradient.appendChild(stopStart);
+					gradient.appendChild(stopEnd);
+					defs.appendChild(gradient);
+					p.style.stroke = `url(#${gid})`;
+				}
 				svg.appendChild(p);
-			}
+			});
+			if (defs.childNodes.length > 0) svg.appendChild(defs);
 			contentEl.appendChild(svg);
 		}
 
-		const active = new Set(tree.activePath ?? []);
 		const bpByNode = tree.branchPoints ?? {};
 		for (const node of tree.nodes) {
 			const column = layout.columns.get(node.branchId) ?? 0;
@@ -389,6 +465,8 @@ export function installConversationTree(ctx, api) {
 			if (position === void 0) continue;
 			contentEl.appendChild(nodeRow(node, column, bpByNode[node.id], active.has(node.id), position));
 		}
+		// 树宽变化（新增分支）后按最新宽度重新水平居中。
+		layoutPanel();
 	}
 
 	function ensurePanel() {
