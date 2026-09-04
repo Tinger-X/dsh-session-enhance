@@ -164,6 +164,14 @@ function applyWorkspaceBrowser(ctx) {
 		if (!result.ok) throw new Error(result.error.message);
 		return result.value;
 	};
+	/** PLUS：读取归档会话的转录消息（预览对话）。 */
+	const previewSession = async (sessionId) => {
+		const registry = ctx.get("remote.workspaceRegistry");
+		if (registry === void 0) throw new Error("dsh-session-enhance remote service is unavailable");
+		const result = await registry.previewSession(sessionId);
+		if (!result.ok) throw new Error(result.error.message);
+		return result.value;
+	};
 	/** PLUS：按物理 session 文件同步 storages 记录（清理幽灵/修正归属/补记漏记）。 */
 	const syncRecords = async () => {
 		const registry = ctx.get("remote.workspaceRegistry");
@@ -211,6 +219,22 @@ function applyWorkspaceBrowser(ctx) {
 	};
 	const switchBranch = async (sessionId, branchId) => {
 		const result = await treeRegistry().switchBranch(sessionId, branchId);
+		if (!result.ok) throw new Error(result.error.message);
+		return result.value;
+	};
+	/** PLUS：列出可清理的空工作区目录（sessions 根目录下的空子目录残留）。 */
+	const listEmptyWorkspaceDirectories = async () => {
+		const registry = ctx.get("remote.workspaceRegistry");
+		if (registry === void 0) throw new Error("dsh-session-enhance remote service is unavailable");
+		const result = await registry.listEmptyWorkspaceDirectories();
+		if (!result.ok) throw new Error(result.error.message);
+		return result.value;
+	};
+	/** PLUS：删除一个空工作区目录残留（仅接受 sessions 根目录的直接子目录名）。 */
+	const deleteEmptyWorkspaceDirectory = async (name) => {
+		const registry = ctx.get("remote.workspaceRegistry");
+		if (registry === void 0) throw new Error("dsh-session-enhance remote service is unavailable");
+		const result = await registry.deleteEmptyWorkspaceDirectory(name);
 		if (!result.ok) throw new Error(result.error.message);
 		return result.value;
 	};
@@ -302,9 +326,15 @@ function applyWorkspaceBrowser(ctx) {
 			unarchiveSessions,
 			deleteArchivedSessions,
 			archivedSessionMetadata,
+			previewSession,
 			syncRecords,
 			getSettings,
 			setSettings,
+			listEmptyWorkspaceDirectories,
+			deleteEmptyWorkspaceDirectory,
+			deleteWorkspace: async (workspaceId) => {
+				await ctx.workspaces.delete(workspaceId);
+			},
 			pickDirectory: () => ctx.workspaces.pickDirectory(),
 			t: ctx.locale.bind(NS)
 		})

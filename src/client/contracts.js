@@ -144,6 +144,47 @@ const treeActionResultSchema = {
 		return value;
 	}
 };
+
+/** 空工作区目录名（sessions 根目录的直接子目录名）。 */
+const emptyWorkspaceDirectoryNameSchema = {
+	parse(value) {
+		if (typeof value !== "string" || value.length === 0 || value === "." || value === ".." || value.includes("/") || value.includes("\\")) throw new TypeError("name must be a non-empty direct child directory name");
+		return value;
+	}
+};
+/** 空工作区目录列表：`{ directories: [{ name, path }] }`。 */
+const emptyWorkspaceDirectoriesSchema = {
+	parse(value) {
+		if (typeof value !== "object" || value === null || Array.isArray(value) || !Array.isArray(value.directories)) throw new TypeError("result.directories must be an array");
+		if (value.directories.some((dir) => typeof dir !== "object" || dir === null || typeof dir.name !== "string" || typeof dir.path !== "string")) throw new TypeError("directories must contain name/path objects");
+		return value;
+	}
+};
+/** 删除空工作区目录结果：`{ deleted: true, name }`。 */
+const workspaceDirectoryDeletedSchema = {
+	parse(value) {
+		if (typeof value !== "object" || value === null || Array.isArray(value) || value.deleted !== true || typeof value.name !== "string") throw new TypeError("deleted must be true and name must be a string");
+		return value;
+	}
+};
+/** 归档会话预览结果：`{ sessionId, messages: [{ kind, text, tag?, name?, label? }] }`。 */
+const previewSessionSchema = {
+	parse(value) {
+		if (typeof value !== "object" || value === null || Array.isArray(value)) throw new TypeError("result must be an object");
+		if (typeof value.sessionId !== "string" || value.sessionId.length === 0) throw new TypeError("sessionId must be a non-empty string");
+		if (!Array.isArray(value.messages)) throw new TypeError("messages must be an array");
+		for (const message of value.messages) {
+			if (typeof message !== "object" || message === null) throw new TypeError("messages must contain objects");
+			if (message.kind !== "user" && message.kind !== "assistant" && message.kind !== "system") throw new TypeError("message.kind must be user, assistant, or system");
+			if (typeof message.text !== "string") throw new TypeError("message.text must be a string");
+			if (message.time !== void 0 && (typeof message.time !== "number" || !Number.isFinite(message.time))) throw new TypeError("message.time must be a finite number when provided");
+			for (const key of ["tag", "name", "label"]) {
+				if (message[key] !== void 0 && typeof message[key] !== "string") throw new TypeError(`message.${key} must be a string when provided`);
+			}
+		}
+		return value;
+	}
+};
 const SESSION_ENHANCE_REMOTE = {
 	package: "dsh-session-enhance",
 	descriptors: [
@@ -238,6 +279,25 @@ const SESSION_ENHANCE_REMOTE = {
 			sourceLocation: { file: "dsh-session-enhance/lib/workspace.js", line: 1, column: 1 }
 		},
 		{
+			id: "dsh-session-enhance#workspaceRegistry/previewSession",
+			service: "workspaceRegistry",
+			namespace: "workspaceRegistry",
+			method: "previewSession",
+			invocation: { kind: "direct" },
+			parameters: [{
+				name: "sessionId",
+				wire: "sessionId",
+				source: "json",
+				codec: { mode: "strict", typeSymbol: "@deepseek-ai/dsh-session/types#SessionId", schema: sessionIdSchema }
+			}],
+			result: {
+				mode: "strict",
+				typeSymbol: "dsh-session-enhance/types#SessionPreview",
+				schema: previewSessionSchema
+			},
+			sourceLocation: { file: "dsh-session-enhance/lib/workspace.js", line: 1, column: 1 }
+		},
+		{
 			id: "dsh-session-enhance#workspaceRegistry/moveSession",
 			service: "workspaceRegistry",
 			namespace: "workspaceRegistry",
@@ -328,6 +388,20 @@ const SESSION_ENHANCE_REMOTE = {
 			sourceLocation: { file: "dsh-session-enhance/lib/workspace.js", line: 1, column: 1 }
 		},
 		{
+			id: "dsh-session-enhance#workspaceRegistry/listEmptyWorkspaceDirectories",
+			service: "workspaceRegistry",
+			namespace: "workspaceRegistry",
+			method: "listEmptyWorkspaceDirectories",
+			invocation: { kind: "direct" },
+			parameters: [],
+			result: {
+				mode: "strict",
+				typeSymbol: "dsh-session-enhance/types#EmptyWorkspaceDirectories",
+				schema: emptyWorkspaceDirectoriesSchema
+			},
+			sourceLocation: { file: "dsh-session-enhance/lib/workspace.js", line: 1, column: 1 }
+		},
+		{
 			id: "dsh-session-enhance#workspaceRegistry/regenerate",
 			service: "workspaceRegistry",
 			namespace: "workspaceRegistry",
@@ -401,6 +475,25 @@ const SESSION_ENHANCE_REMOTE = {
 				mode: "strict",
 				typeSymbol: "dsh-session-enhance/types#TreeActionResult",
 				schema: treeActionResultSchema
+			},
+			sourceLocation: { file: "dsh-session-enhance/lib/workspace.js", line: 1, column: 1 }
+		},
+		{
+			id: "dsh-session-enhance#workspaceRegistry/deleteEmptyWorkspaceDirectory",
+			service: "workspaceRegistry",
+			namespace: "workspaceRegistry",
+			method: "deleteEmptyWorkspaceDirectory",
+			invocation: { kind: "direct" },
+			parameters: [{
+				name: "name",
+				wire: "name",
+				source: "json",
+				codec: { mode: "strict", typeSymbol: "dsh-session-enhance/types#EmptyWorkspaceDirectoryName", schema: emptyWorkspaceDirectoryNameSchema }
+			}],
+			result: {
+				mode: "strict",
+				typeSymbol: "dsh-session-enhance/types#WorkspaceDirectoryDeleted",
+				schema: workspaceDirectoryDeletedSchema
 			},
 			sourceLocation: { file: "dsh-session-enhance/lib/workspace.js", line: 1, column: 1 }
 		}
