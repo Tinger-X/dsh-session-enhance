@@ -7,9 +7,12 @@
  * - 滚动口：`[data-conversation-scroll]`
  * - 输入区：`[data-slot="conversation.composer"]`（回退 `[data-composer-card]` / `[data-composer-seat]`）
  *
- * 面板挂在会话中栏内（fixed），顶部对齐 header 底、底部对齐输入区顶，水平居中于中栏。
- * 默认仅渲染节点（圆点），悬浮显示文本概览；节点按深度竖直、按分支横向错位，并用
- * 平滑贝塞尔曲线连线呈现树结构，连线与圆点按分支着色（跨列连线渐变过渡）。
+ * 面板挂在会话中栏内（fixed），贴中栏左缘，顶部对齐 header 底、底部对齐输入区顶。
+ * 节点图以单个 <canvas> 绘制（整数超采样 ≥2 抗锯齿）：采用「叶中位」tidy 布局，每个叶
+ * 独占一列、内部节点取子树叶区间中点——兄弟子树区间互斥连续，连线只在相邻两层扇出且
+ * 不越出本子树区间，因此新旧分支永不交叉。整簇在固定宽度透明树列内水平居中（单链=一
+ * 列圆点竖在列正中），贝塞尔曲线连线按分支着色（跨列渐变）。布局只由拓扑与分支序决定，
+ * 切分支/点选只改高亮不改布局。悬浮/点击/切分支由 canvas 命中检测驱动。
  */
 
 const CSS_ID = "dsh-session-enhance/tree.module.css";
@@ -19,15 +22,7 @@ const CSS = [
 	".dshct_scroll{position:relative;flex:1 1 auto;overflow-y:auto;overflow-x:hidden;pointer-events:auto;scrollbar-width:none}",
 	".dshct_scroll::-webkit-scrollbar{display:none}",
 	".dshct_content{position:relative}",
-	".dshct_edges{position:absolute;left:0;top:0;overflow:visible;pointer-events:none}",
-	".dshct_edge{fill:none;stroke:var(--dsw-alias-label-caption,#c9cdd4);stroke-width:1.6;stroke-linecap:round;opacity:.38;transition:opacity .15s,stroke-width .15s}",
-	".dshct_edge[data-active]{stroke-width:2.1;opacity:.95}",
-	".dshct_node{position:absolute;display:flex;align-items:center;gap:4px;white-space:nowrap;cursor:pointer}",
-	".dshct_dot{width:10px;height:10px;border-radius:50%;background:var(--dsw-alias-bg-layer-2,#fff);border:2px solid var(--dshct-branch-color,var(--dsw-alias-label-caption,#c0c4cc));box-sizing:border-box;transition:transform .12s,background .12s,box-shadow .12s,border-color .12s}",
-	".dshct_node:hover .dshct_dot{transform:scale(1.35)}",
-	".dshct_node[data-fork]:not([data-active]) .dshct_dot{box-shadow:0 0 0 2.5px color-mix(in srgb,var(--dshct-branch-color,var(--dsw-alias-label-caption,#c0c4cc)) 18%,transparent)}",
-	".dshct_node[data-active] .dshct_dot{background:var(--dshct-branch-color,var(--dsw-alias-brand-primary,#3b82f6));border-color:transparent;box-shadow:0 0 0 3.5px color-mix(in srgb,var(--dshct-branch-color,var(--dsw-alias-brand-primary,#3b82f6)) 20%,transparent)}",
-	".dshct_node[data-faded] .dshct_dot{opacity:.45}",
+	".dshct_canvas{display:block;touch-action:manipulation}",
 	".dshct_branch{display:inline-flex;align-items:center;gap:3px;font-size:11px;color:var(--dsw-alias-label-secondary,#61666b);background:var(--dsw-alias-bg-layer-2,#fff);border:1px solid var(--dsw-alias-border-l2,rgba(0,0,0,.1));border-radius:7px;padding:1px 3px;box-shadow:var(--dsw-shadow-lv1,0 2px 8px rgba(0,0,0,.08))}",
 	".dshct_branch button{background:none;border:none;color:inherit;cursor:pointer;border-radius:5px;padding:0 5px;height:18px;line-height:16px}",
 	".dshct_branch button:hover{background:var(--dsw-alias-interactive-bg-hover,rgba(0,0,0,.06))}",
@@ -44,11 +39,17 @@ const CSS = [
 
 const ROW_GAP = 28;
 const COLUMN_GAP = 20;
-const PAD_LEFT = 10;
 const PAD_TOP = 10;
 const DOT_SIZE = 10;
 const DOT_R = DOT_SIZE / 2;
-const PANEL_MAX_WIDTH = 220;
+const DOT_LW = 2;
+// 树列宽：单链/窄树即固定 BASE（一条约 96px 的透明列，图簇在其中水平居中）；
+// 分叉展开超过 BASE 内容时列随图簇加宽，两侧保留 TREE_INSET 对称留白；上限 TREE_MAX_WIDTH。
+const TREE_RAIL_BASE = 96;
+const TREE_INSET = 16;
+const TREE_MAX_WIDTH = 220;
+// canvas 命中半径（大于视觉半径，便于点击/悬浮）。
+const HIT_RADIUS = 14;
 
 /** 分支调色板：与 .dshct_panel 上的 --dshct-palette-N 变量一一对应，按分支列序循环取色。 */
 const BRANCH_COLOR_VARS = ["--dshct-palette-0", "--dshct-palette-1", "--dshct-palette-2", "--dshct-palette-3", "--dshct-palette-4", "--dshct-palette-5"];
@@ -108,6 +109,17 @@ export function installConversationTree(ctx, api) {
 	let resizeObserver = null;
 	let observedTargets = null;
 	let paletteCache = null;
+	// canvas 渲染状态。
+	let canvasEl = null;
+	let drawColors = null;
+	let renderNodes = []; // { id, node, x, y, column, color, active, fork }
+	let renderEdges = []; // { from, to, fromColor, toColor, active }
+	let lastLayout = null;
+	let hoverId = null;
+	let themeObserver = null;
+	let themeDarkMedia = null;
+	let themeDarkCb = null;
+	let themeRedrawTimer = null;
 
 	/** 解析面板上的分支调色板（alias 变量在面板上下文中求值，跟随主题）。 */
 	function branchPalette() {
@@ -118,10 +130,6 @@ export function installConversationTree(ctx, api) {
 			return value !== "" ? value : BRANCH_COLOR_FALLBACK[index];
 		});
 		return paletteCache;
-	}
-
-	function branchColor(columns, branchId) {
-		return colorForColumn(columns.get(branchId) ?? 0);
 	}
 
 	function colorForColumn(column) {
@@ -214,46 +222,43 @@ export function installConversationTree(ctx, api) {
 		return (tree.nodes ?? []).filter((node) => active.has(node.id)).sort((a, b) => a.depth - b.depth);
 	}
 
-	/** 面板宽度（无树时为 0）；居中定位需要，与 render 保持同一算法。 */
-	function panelWidth() {
-		if (tree === null || !Array.isArray(tree.nodes) || tree.nodes.length === 0) return 0;
-		return Math.min(layoutNodes(tree).width, PANEL_MAX_WIDTH);
+	/** 该轮次能否安全重新生成：下方不得有在其旧延续上分叉的子分支（与 model 守卫一致）。
+	 *  有则隐藏按钮，避免触发会把子树改写的危险操作。 */
+	function isRegenNodeSafe(node) {
+		if (tree === null) return false;
+		const branches = tree.branches ?? [];
+		return !branches.some((b) => b.parentBranchId === node.branchId && b.forkDepth >= node.depth);
 	}
 
 	function layoutPanel() {
 		if (panel === null || !panel.isConnected) return;
 		const anchors = findAnchors();
 		const { conv, scrollport, header, composer } = anchors;
-		let box = null; // 水平居中的参照矩形（会话中栏/滚动口）
+		let left = 0;
 		let top = 0;
 		let bottom = 0;
 		if (scrollport !== null) {
 			const rect = scrollport.getBoundingClientRect();
-			box = rect;
+			left = rect.left + 6;
 			top = rect.top;
 			bottom = Math.max(0, window.innerHeight - rect.bottom);
 		} else if (header !== null && composer !== null) {
-			box = (conv !== null ? conv : header).getBoundingClientRect();
+			left = (conv !== null ? conv.getBoundingClientRect().left : header.getBoundingClientRect().left) + 6;
 			top = header.getBoundingClientRect().bottom + 4;
 			bottom = Math.max(0, window.innerHeight - composer.getBoundingClientRect().top + 4);
 		} else if (conv !== null) {
-			box = conv.getBoundingClientRect();
-			top = box.top;
+			const rect = conv.getBoundingClientRect();
+			left = rect.left + 6;
+			top = rect.top;
 			bottom = 0;
 		} else {
 			return;
 		}
-		// 水平居中于参照矩形；宽度超出时回退为贴左缘。
-		const width = panelWidth();
-		const minLeft = box.left + 4;
-		let left = box.left + (box.width - width) / 2;
-		if (left < minLeft) left = minLeft;
-		left = Math.min(left, Math.max(minLeft, box.right - width - 4));
+		// 面板贴会话中栏左缘；宽度由 render 依内容设置，这里不覆盖。
 		panel.style.position = "fixed";
 		panel.style.left = `${left}px`;
 		panel.style.top = `${top}px`;
 		panel.style.bottom = `${bottom}px`;
-		panel.style.width = `${width}px`;
 	}
 
 	function removePanel() {
@@ -267,6 +272,12 @@ export function installConversationTree(ctx, api) {
 		scrollEl = null;
 		contentEl = null;
 		paletteCache = null;
+		canvasEl = null;
+		drawColors = null;
+		renderNodes = [];
+		renderEdges = [];
+		lastLayout = null;
+		hoverId = null;
 		// 保留 tree 缓存：切回「对话」视图时可立即渲染，无需等 debounced load。
 		hideTooltip();
 		hideActionTip();
@@ -290,7 +301,7 @@ export function installConversationTree(ctx, api) {
 			resizeObserver = null;
 		}
 		if (targets.length === 0) return;
-		resizeObserver = new ResizeObserver(() => layoutPanel());
+		resizeObserver = new ResizeObserver(() => relayoutCanvas());
 		for (const target of targets) resizeObserver.observe(target);
 	}
 
@@ -313,40 +324,95 @@ export function installConversationTree(ctx, api) {
 		tooltip.style.top = `${Math.max(12, rect.top)}px`;
 	}
 
+	/** 分支稳定序号：按分支创建顺序（root 优先）。切换活动分支时不变；此处仅用于着色与子节点排序。 */
 	function computeColumns(tree) {
 		const columns = new Map();
 		let next = 0;
-		// 按分支创建顺序（root 优先）稳定分配列；切换活动分支时列位不变，树结构恒定。
 		for (const branch of tree.branches ?? []) {
 			if (!columns.has(branch.id)) columns.set(branch.id, next++);
 		}
 		return columns;
 	}
 
-	/** 计算每个节点圆点中心坐标 + 面板尺寸。 */
+	/**
+	 * 计算每个节点圆点中心坐标 + 面板尺寸（叶中位 tidy 布局，无交叉）。
+	 *
+	 * 每棵树至多一个根；每个叶子节点独占一列（序号沿 DFS 递增），内部节点取
+	 * 子树叶区间的中点 → 兄弟子树占据互斥、连续的叶区间，且任意一条边只跨越相邻
+	 * 两个深度、水平范围落在本子树区间内，因此新旧分支的任何两条连线都不相交。
+	 *
+	 * 子节点次序与活动分支无关（同分支续接优先、其余按分支创建序），布局只由拓扑
+	 * 决定：切分支/点选只改高亮，不重排；仅分叉使叶增多时才整体重排居中。
+	 */
 	function layoutNodes(tree) {
-		const columns = computeColumns(tree);
+		const branchIndex = computeColumns(tree);
+		const childrenOf = new Map();
+		for (const n of tree.nodes ?? []) {
+			if (n.parentId === null || n.parentId === void 0) continue;
+			const list = childrenOf.get(n.parentId) ?? [];
+			list.push(n);
+			childrenOf.set(n.parentId, list);
+		}
+
+		// DFS：叶子依次编号；内部节点取子树叶区间中点的列号（可为 .5 步长）。
+		let leafCursor = 0;
+		const leafCenter = new Map();
+		const place = (node) => {
+			const kids = childrenOf.get(node.id) ?? [];
+			if (kids.length === 0) {
+				leafCenter.set(node.id, leafCursor);
+				leafCursor += 1;
+				return;
+			}
+			kids.sort((a, b) => {
+				const ka = (a.branchId === node.branchId ? -1 : branchIndex.get(a.branchId) ?? 0);
+				const kb = (b.branchId === node.branchId ? -1 : branchIndex.get(b.branchId) ?? 0);
+				if (ka !== kb) return ka - kb;
+				return (branchIndex.get(a.branchId) ?? 0) - (branchIndex.get(b.branchId) ?? 0);
+			});
+			let lo = Infinity;
+			let hi = -Infinity;
+			for (const kid of kids) {
+				place(kid);
+				const c = leafCenter.get(kid.id);
+				if (c < lo) lo = c;
+				if (c > hi) hi = c;
+			}
+			leafCenter.set(node.id, (lo + hi) / 2);
+		};
+		const roots = (tree.nodes ?? []).filter((n) => n.parentId === null || n.parentId === void 0);
+		roots.sort((a, b) => (branchIndex.get(a.branchId) ?? 0) - (branchIndex.get(b.branchId) ?? 0));
+		for (const root of roots) place(root);
+
 		const positions = new Map();
 		let maxDepth = 0;
-		let maxColumn = 0;
+		let minX = Infinity;
+		let maxX = -Infinity;
 		for (const node of tree.nodes ?? []) {
-			const column = columns.get(node.branchId) ?? 0;
-			const x = PAD_LEFT + column * COLUMN_GAP + DOT_R;
+			const c = leafCenter.get(node.id);
+			if (c === void 0) continue;
+			maxDepth = Math.max(maxDepth, node.depth);
+			const x = c * COLUMN_GAP;
 			const y = PAD_TOP + (node.depth - 1) * ROW_GAP + DOT_R;
 			positions.set(node.id, { x, y });
-			maxDepth = Math.max(maxDepth, node.depth);
-			maxColumn = Math.max(maxColumn, column);
+			if (x < minX) minX = x;
+			if (x > maxX) maxX = x;
 		}
-		const width = PAD_LEFT + (maxColumn + 1) * COLUMN_GAP + DOT_R + 20;
+		const figureW = maxX - minX + DOT_SIZE;
+		// 树列宽：窄树取固定 BASE，图簇两侧留对称留白；过宽时整体居中后裁剪上限 MAX。
+		const railW = Math.max(TREE_RAIL_BASE, figureW + 2 * TREE_INSET);
+		const width = Math.min(railW, TREE_MAX_WIDTH);
+		// 把图簇水平中心对齐树列中心。
+		const shift = width / 2 - (minX + maxX) / 2;
+		for (const point of positions.values()) point.x += shift;
 		const height = PAD_TOP + maxDepth * ROW_GAP + DOT_R + 12;
-		return { columns, positions, width, height, maxDepth };
+		return { columns: branchIndex, positions, width, height, maxDepth };
 	}
 
-	/** 生成节点连线：同列竖直直线；跨列用三次贝塞尔曲线平滑过渡。
-	 *  颜色取子节点分支色（跨列渐变由父色过渡到子色），并标记是否在活动路径上。 */
-	function buildEdges(tree, layout, activeSet) {
+	/** 生成连线几何：同列竖直直线；跨列用三次贝塞尔曲线平滑过渡。
+	 *  颜色取子/父分支列（跨列渐变由父色过渡到子色），并标记是否整条在活动路径上。 */
+	function buildEdgeGeom(tree, layout, activeSet) {
 		const byId = new Map((tree.nodes ?? []).map((node) => [node.id, node]));
-		const colorOf = (node) => branchColor(layout.columns, node.branchId);
 		const edges = [];
 		for (const node of tree.nodes ?? []) {
 			if (node.parentId === null || node.parentId === void 0) continue;
@@ -355,118 +421,270 @@ export function installConversationTree(ctx, api) {
 			const from = layout.positions.get(parent.id);
 			const to = layout.positions.get(node.id);
 			if (from === void 0 || to === void 0) continue;
-			let path;
-			if (from.x === to.x) {
-				path = `M ${from.x} ${from.y + DOT_R} L ${to.x} ${to.y - DOT_R}`;
-			} else {
-				const midY = (from.y + to.y) / 2;
-				path = `M ${from.x} ${from.y + DOT_R} C ${from.x} ${midY}, ${to.x} ${midY}, ${to.x} ${to.y - DOT_R}`;
-			}
 			edges.push({
-				path,
 				from,
 				to,
-				fromColor: colorOf(parent),
-				toColor: colorOf(node),
-				active: activeSet.has(parent.id) && activeSet.has(node.id),
+				fromColor: colorForColumn(layout.columns.get(parent.branchId) ?? 0),
+				toColor: colorForColumn(layout.columns.get(node.branchId) ?? 0),
+				active: activeSet.has(parent.id) && activeSet.has(node.id)
 			});
 		}
 		return edges;
 	}
 
-	function nodeRow(node, column, bp, isActive, position) {
-		const row = document.createElement("div");
-		row.className = "dshct_node";
-		if (isActive) row.setAttribute("data-active", "");
-		else row.setAttribute("data-faded", "");
-		if (bp !== void 0) row.setAttribute("data-fork", "");
-		row.dataset.nodeId = node.id;
-		row.dataset.branchId = node.branchId;
-		row.style.setProperty("--dshct-branch-color", colorForColumn(column));
-		row.style.left = `${position.x - DOT_R}px`;
-		row.style.top = `${position.y - DOT_R}px`;
+	/** 解析绘制颜色（canvas 不能用 CSS var）。occlude 为圆点底遮，盖住从圆心穿过的连线。 */
+	function resolveDrawColors() {
+		const cs = panel !== null && panel.isConnected ? window.getComputedStyle(panel) : null;
+		const read = (name, fallback) => {
+			const value = cs !== null ? (cs.getPropertyValue(name) || "").trim() : "";
+			return value !== "" ? value : fallback;
+		};
+		branchPalette();
+		return { occlude: read("--dsw-alias-bg-layer-2", "#ffffff") };
+	}
 
-		const dot = document.createElement("span");
-		dot.className = "dshct_dot";
-		row.appendChild(dot);
+	/** 渲染超采样比例：取 ≥2 的整数（devicePixelRatio 兜底），避免亚像素取整造成的锯齿。 */
+	function renderScale() {
+		const dpr = (typeof window !== "undefined" && window.devicePixelRatio) || 1;
+		return Math.max(2, Math.round(dpr));
+	}
 
-		row.addEventListener("mouseenter", () => showTooltip(node, row));
-		row.addEventListener("mouseleave", hideTooltip);
-		row.addEventListener("click", () => {
-			if (isActive) scrollToTurn(node.depth);
-			else switchTo(node.branchId);
-		});
+	/** 按当前比例同步 canvas 后备缓冲（CSS 尺寸不变；缓冲变小时即清空重绘）。 */
+	function syncCanvasResolution() {
+		if (canvasEl === null || lastLayout === null) return;
+		const scale = renderScale();
+		const w = Math.round(lastLayout.width * scale);
+		const h = Math.round(lastLayout.height * scale);
+		if (canvasEl.width !== w || canvasEl.height !== h) {
+			canvasEl.width = w;
+			canvasEl.height = h;
+		}
+		canvasEl.style.width = `${lastLayout.width}px`;
+		canvasEl.style.height = `${lastLayout.height}px`;
+	}
 
-		return row;
+	/** 布局/窗口尺寸或 DPR 变化时：重定位 + 重设缓冲 + 重绘（仅几何位移，节点坐标不变）。 */
+	function relayoutCanvas() {
+		layoutPanel();
+		if (canvasEl === null || lastLayout === null) return;
+		syncCanvasResolution();
+		drawScene();
+	}
+
+	/** 描一条边：同列直线；跨列贝塞尔（控制点取纵向中点）。 */
+	function traceEdge(ctx, edge) {
+		const { from, to } = edge;
+		ctx.beginPath();
+		ctx.moveTo(from.x, from.y + DOT_R);
+		if (from.x === to.x) {
+			ctx.lineTo(to.x, to.y - DOT_R);
+		} else {
+			const midY = (from.y + to.y) / 2;
+			ctx.bezierCurveTo(from.x, midY, to.x, midY, to.x, to.y - DOT_R);
+		}
+	}
+
+	/** 画一个节点圆点：先底色遮线，再实心（活动）或空心描边（非活动），分叉点带柔和光环。 */
+	function drawNodeMarker(ctx, marker) {
+		const scale = hoverId === marker.id ? 1.35 : 1;
+		const r = DOT_R * scale;
+		const color = marker.color;
+		const isActive = marker.active;
+		ctx.save();
+
+		// 底遮：用面板底色盖住从圆心穿过的连线。
+		ctx.beginPath();
+		ctx.arc(marker.x, marker.y, r + DOT_LW / 2 + 0.5, 0, Math.PI * 2);
+		ctx.fillStyle = drawColors.occlude;
+		ctx.fill();
+
+		if (isActive) {
+			// 实心活动点 + 双层外圈光晕。
+			ctx.beginPath();
+			ctx.arc(marker.x, marker.y, r, 0, Math.PI * 2);
+			ctx.fillStyle = color;
+			ctx.fill();
+			ctx.globalAlpha = 0.16;
+			ctx.beginPath();
+			ctx.arc(marker.x, marker.y, r + 3.4, 0, Math.PI * 2);
+			ctx.lineWidth = 4;
+			ctx.strokeStyle = color;
+			ctx.stroke();
+			ctx.globalAlpha = 0.3;
+			ctx.beginPath();
+			ctx.arc(marker.x, marker.y, r + 1.6, 0, Math.PI * 2);
+			ctx.lineWidth = 2.4;
+			ctx.stroke();
+		} else {
+			if (marker.fork) {
+				// 分叉点：柔和光环。
+				ctx.beginPath();
+				ctx.arc(marker.x, marker.y, r + 3.6, 0, Math.PI * 2);
+				ctx.lineWidth = 3;
+				ctx.strokeStyle = color;
+				ctx.globalAlpha = 0.2;
+				ctx.stroke();
+			}
+			ctx.globalAlpha = 0.55;
+			ctx.beginPath();
+			ctx.arc(marker.x, marker.y, r, 0, Math.PI * 2);
+			ctx.lineWidth = DOT_LW;
+			ctx.strokeStyle = color;
+			ctx.stroke();
+		}
+		ctx.restore();
+	}
+
+	function drawScene() {
+		if (canvasEl === null || lastLayout === null) return;
+		if (drawColors === null) drawColors = resolveDrawColors();
+		const ctx = canvasEl.getContext("2d");
+		syncCanvasResolution();
+		const sx = lastLayout.width > 0 ? canvasEl.width / lastLayout.width : 1;
+		const sy = lastLayout.height > 0 ? canvasEl.height / lastLayout.height : 1;
+		ctx.setTransform(1, 0, 0, 1, 0, 0);
+		ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+		ctx.setTransform(sx, 0, 0, sy, 0, 0);
+		ctx.lineCap = "round";
+
+		// 1) 连线（圆点下层）。活动路径加粗高亮，非活动弱化。
+		for (const edge of renderEdges) {
+			ctx.globalAlpha = edge.active ? 0.95 : 0.34;
+			ctx.lineWidth = edge.active ? 2.2 : 1.4;
+			let stroke = edge.fromColor;
+			if (edge.fromColor !== edge.toColor) {
+				const gradient = ctx.createLinearGradient(edge.from.x, edge.from.y, edge.to.x, edge.to.y);
+				gradient.addColorStop(0, edge.fromColor);
+				gradient.addColorStop(1, edge.toColor);
+				stroke = gradient;
+			}
+			ctx.strokeStyle = stroke;
+			traceEdge(ctx, edge);
+			ctx.stroke();
+		}
+
+		// 2) 节点圆点（上层）。先复位 alpha，避免上一条边的透明度漏进圆点底色。
+		ctx.globalAlpha = 1;
+		for (const marker of renderNodes) drawNodeMarker(ctx, marker);
+		ctx.globalAlpha = 1;
+	}
+
+	/** 命中检测：canvas 逻辑坐标（CSS px）内最近的圆点，超 HIT_RADIUS 返回 null。 */
+	function hitAt(x, y) {
+		let best = null;
+		let bestDist = HIT_RADIUS * HIT_RADIUS;
+		for (const marker of renderNodes) {
+			const dx = x - marker.x;
+			const dy = y - marker.y;
+			const d2 = dx * dx + dy * dy;
+			if (d2 <= bestDist) {
+				bestDist = d2;
+				best = marker;
+			}
+		}
+		return best;
+	}
+
+	/** 为圆点合成一个锚点矩形，供 showTooltip 定位。 */
+	function anchorForNode(marker) {
+		const rect = canvasEl !== null ? canvasEl.getBoundingClientRect() : null;
+		return {
+			getBoundingClientRect: () => {
+				if (rect === null) return { left: 0, top: 0, right: 0, bottom: 0, width: 0, height: 0 };
+				return {
+					left: rect.left + marker.x - DOT_R,
+					top: rect.top + marker.y - DOT_R,
+					width: DOT_SIZE,
+					height: DOT_SIZE,
+					right: rect.left + marker.x + DOT_R,
+					bottom: rect.top + marker.y + DOT_R
+				};
+			}
+		};
+	}
+
+	function onCanvasPointerMove(event) {
+		if (canvasEl === null) return;
+		const marker = hitAt(event.offsetX, event.offsetY);
+		canvasEl.style.cursor = marker !== null ? "pointer" : "default";
+		const id = marker !== null ? marker.id : null;
+		if (id === hoverId) return;
+		hoverId = id;
+		drawScene();
+		if (marker !== null) showTooltip(marker.node, anchorForNode(marker));
+		else hideTooltip();
+	}
+
+	function onCanvasPointerLeave() {
+		if (hoverId !== null) {
+			hoverId = null;
+			drawScene();
+		}
+		hideTooltip();
+	}
+
+	function onCanvasClick(event) {
+		const marker = hitAt(event.offsetX, event.offsetY);
+		if (marker === null) return;
+		if (marker.active) scrollToTurn(marker.node.depth);
+		else switchTo(marker.node.branchId);
 	}
 
 	function render() {
 		if (panel === null || scrollEl === null) return;
 		scrollEl.innerHTML = "";
 		contentEl = null;
-		if (tree === null || !Array.isArray(tree.nodes) || tree.nodes.length === 0) return;
+		canvasEl = null;
+		hoverId = null;
+		lastLayout = null;
+		drawColors = null;
+		renderNodes = [];
+		renderEdges = [];
+		hideTooltip();
+		if (tree === null || !Array.isArray(tree.nodes) || tree.nodes.length === 0) {
+			panel.style.width = "0px";
+			return;
+		}
 
 		const layout = layoutNodes(tree);
+		const active = new Set(tree.activePath ?? []);
+		const bpSet = new Set(Object.keys(tree.branchPoints ?? {}));
+		drawColors = resolveDrawColors();
+		renderNodes = [];
+		for (const node of tree.nodes) {
+			const position = layout.positions.get(node.id);
+			if (position === void 0) continue;
+			const column = layout.columns.get(node.branchId) ?? 0;
+			renderNodes.push({
+				id: node.id,
+				node,
+				x: position.x,
+				y: position.y,
+				column,
+				color: colorForColumn(column),
+				active: active.has(node.id),
+				fork: bpSet.has(node.id)
+			});
+		}
+		renderEdges = buildEdgeGeom(tree, layout, active);
+		lastLayout = layout;
+
 		contentEl = document.createElement("div");
 		contentEl.className = "dshct_content";
 		contentEl.style.width = `${layout.width}px`;
 		contentEl.style.height = `${layout.height}px`;
+		canvasEl = document.createElement("canvas");
+		canvasEl.className = "dshct_canvas";
+		canvasEl.style.cursor = "default";
+		contentEl.appendChild(canvasEl);
 		scrollEl.appendChild(contentEl);
-		panel.style.width = `${panelWidth()}px`;
+		syncCanvasResolution();
+		panel.style.width = `${layout.width}px`;
 
-		const active = new Set(tree.activePath ?? []);
-		const edges = buildEdges(tree, layout, active);
-		if (edges.length > 0) {
-			const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-			svg.setAttribute("class", "dshct_edges");
-			svg.setAttribute("width", layout.width);
-			svg.setAttribute("height", layout.height);
-			svg.style.width = `${layout.width}px`;
-			svg.style.height = `${layout.height}px`;
-			const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
-			edges.forEach((edge, index) => {
-				const p = document.createElementNS("http://www.w3.org/2000/svg", "path");
-				p.setAttribute("d", edge.path);
-				p.setAttribute("class", "dshct_edge");
-				if (edge.active) p.setAttribute("data-active", "");
-				if (edge.fromColor === edge.toColor) {
-					p.style.stroke = edge.fromColor;
-				} else {
-					// 跨列连线用父色→子色的线性渐变，颜色过渡与曲线走向一致。
-					const gradient = document.createElementNS("http://www.w3.org/2000/svg", "linearGradient");
-					const gid = `dshct_eg_${index}`;
-					gradient.setAttribute("id", gid);
-					gradient.setAttribute("gradientUnits", "userSpaceOnUse");
-					gradient.setAttribute("x1", edge.from.x);
-					gradient.setAttribute("y1", edge.from.y);
-					gradient.setAttribute("x2", edge.to.x);
-					gradient.setAttribute("y2", edge.to.y);
-					const stopStart = document.createElementNS("http://www.w3.org/2000/svg", "stop");
-					stopStart.setAttribute("offset", "0");
-					stopStart.style.stopColor = edge.fromColor;
-					const stopEnd = document.createElementNS("http://www.w3.org/2000/svg", "stop");
-					stopEnd.setAttribute("offset", "1");
-					stopEnd.style.stopColor = edge.toColor;
-					gradient.appendChild(stopStart);
-					gradient.appendChild(stopEnd);
-					defs.appendChild(gradient);
-					p.style.stroke = `url(#${gid})`;
-				}
-				svg.appendChild(p);
-			});
-			if (defs.childNodes.length > 0) svg.appendChild(defs);
-			contentEl.appendChild(svg);
-		}
-
-		const bpByNode = tree.branchPoints ?? {};
-		for (const node of tree.nodes) {
-			const column = layout.columns.get(node.branchId) ?? 0;
-			const position = layout.positions.get(node.id);
-			if (position === void 0) continue;
-			contentEl.appendChild(nodeRow(node, column, bpByNode[node.id], active.has(node.id), position));
-		}
-		// 树宽变化（新增分支）后按最新宽度重新水平居中。
-		layoutPanel();
+		canvasEl.addEventListener("pointermove", onCanvasPointerMove, { passive: true });
+		canvasEl.addEventListener("pointerleave", onCanvasPointerLeave, { passive: true });
+		canvasEl.addEventListener("click", onCanvasClick);
+		drawScene();
 	}
 
 	function ensurePanel() {
@@ -588,10 +806,15 @@ export function installConversationTree(ctx, api) {
 		const activeNodes = activeNodesByDepth();
 		for (let index = 0; index < tails.length; index += 1) {
 			const tail = tails[index];
-			if (tail.querySelector(".dshct_replyRegen")) continue;
+			const existing = tail.querySelector(".dshct_replyRegen");
 			const branchBtn = findButtonByLabel(tail, ["分支", "branch", "fork"]);
 			if (branchBtn === null) continue;
 			const node = activeNodes[index] ?? { id: `${activeBranch}:${index + 1}`, depth: index + 1, branchId: activeBranch, active: true, userText: "" };
+			if (!isRegenNodeSafe(node)) {
+				if (existing !== null) existing.remove();
+				continue;
+			}
+			if (existing !== null) continue;
 			const btn = iconButton(branchBtn, REGEN_ICON, t("tree.regenerate"), () => doRegenerate(node));
 			btn.classList.add("dshct_replyRegen");
 			branchBtn.after(btn);
@@ -638,7 +861,11 @@ export function installConversationTree(ctx, api) {
 			if (node === null) continue;
 
 			let editBtn = item.querySelector(".dshct_userEdit");
-			if (editBtn === null) {
+			const safe = isRegenNodeSafe(node);
+			if (!safe) {
+				if (editBtn !== null) editBtn.remove();
+				editBtn = null;
+			} else if (editBtn === null) {
 				editBtn = iconButton(copyBtn, EDIT_ICON, t("tree.edit"), () => startInlineEdit(item, node));
 				editBtn.classList.add("dshct_userEdit");
 				copyBtn.after(editBtn);
@@ -648,6 +875,7 @@ export function installConversationTree(ctx, api) {
 			const bp = bpByNode[node.id];
 			const signature = bp === void 0 ? "" : `${bp.current}:${(bp.options ?? []).map((o) => `${o.branchId}${o.active ? "!" : ""}`).join(",")}`;
 			const existing = item.querySelector(".dshct_userBranch");
+			const controlAnchor = editBtn !== null ? editBtn : copyBtn;
 			if (bp === void 0 || (bp.options?.length ?? 0) <= 1) {
 				if (existing !== null) existing.remove();
 				continue;
@@ -657,7 +885,7 @@ export function installConversationTree(ctx, api) {
 			const control = branchControl(bp);
 			control.classList.add("dshct_userBranch");
 			control.dataset.signature = signature;
-			editBtn.after(control);
+			controlAnchor.after(control);
 		}
 	}
 
@@ -787,6 +1015,58 @@ export function installConversationTree(ctx, api) {
 	let unsubList = null;
 	let unsubInst = null;
 
+	/** 主题/accent 变化后需重新解析 CSS var（canvas 不能直接用 var）。去抖后失效缓存并重绘。 */
+	function scheduleThemeRedraw() {
+		if (themeRedrawTimer !== null) return;
+		themeRedrawTimer = setTimeout(() => {
+			themeRedrawTimer = null;
+			paletteCache = null;
+			drawColors = null;
+			if (canvasEl !== null && lastLayout !== null) drawScene();
+		}, 120);
+	}
+
+	/** 轻量监听根/body 的 class/style/data-theme 变化与系统配色切换，驱动重绘。 */
+	function startThemeWatch() {
+		try {
+			if (typeof MutationObserver !== "undefined" && document.documentElement !== null) {
+				themeObserver = new MutationObserver(scheduleThemeRedraw);
+				const options = { attributes: true, attributeFilter: ["class", "style", "data-theme", "data-color-scheme", "color-scheme"] };
+				themeObserver.observe(document.documentElement, options);
+				if (document.body !== null) themeObserver.observe(document.body, options);
+			}
+		} catch {
+			// ignore
+		}
+		try {
+			if (typeof window !== "undefined" && typeof window.matchMedia === "function") {
+				themeDarkMedia = window.matchMedia("(prefers-color-scheme: dark)");
+				themeDarkCb = () => scheduleThemeRedraw();
+				if (typeof themeDarkMedia.addEventListener === "function") themeDarkMedia.addEventListener("change", themeDarkCb);
+				else if (typeof themeDarkMedia.addListener === "function") themeDarkMedia.addListener(themeDarkCb);
+			}
+		} catch {
+			// ignore
+		}
+	}
+
+	function stopThemeWatch() {
+		if (themeObserver !== null) {
+			themeObserver.disconnect();
+			themeObserver = null;
+		}
+		if (themeDarkMedia !== null && themeDarkCb !== null) {
+			if (typeof themeDarkMedia.removeEventListener === "function") themeDarkMedia.removeEventListener("change", themeDarkCb);
+			else if (typeof themeDarkMedia.removeListener === "function") themeDarkMedia.removeListener(themeDarkCb);
+		}
+		themeDarkMedia = null;
+		themeDarkCb = null;
+		if (themeRedrawTimer !== null) {
+			window.clearTimeout(themeRedrawTimer);
+			themeRedrawTimer = null;
+		}
+	}
+
 	/** 订阅 live 会话实例通知（用户发送 / LLM 结束 / 事件追加），去抖后重拉。 */
 	function watchSessionInstance(sid) {
 		if (typeof unsubInst === "function") {
@@ -822,7 +1102,7 @@ export function installConversationTree(ctx, api) {
 	currentSid = currentSessionId();
 	watchSessionInstance(currentSid);
 
-	window.addEventListener("resize", layoutPanel, { passive: true });
+	window.addEventListener("resize", relayoutCanvas, { passive: true });
 	// 仅观察结构性变化（新增消息行 / turn-tail 出现），用于「发送消息」「LLM 回复完成」；
 	// 不观察 characterData，避免流式输出期间高频触发。
 	const observer = new MutationObserver(() => {
@@ -830,6 +1110,7 @@ export function installConversationTree(ctx, api) {
 		scheduleLoad();
 	});
 	observer.observe(document.body, { childList: true, subtree: true });
+	startThemeWatch();
 	load();
 
 	return () => {
@@ -837,8 +1118,9 @@ export function installConversationTree(ctx, api) {
 		if (debounce !== null) window.clearTimeout(debounce);
 		if (typeof unsubList === "function") unsubList();
 		if (typeof unsubInst === "function") unsubInst();
-		window.removeEventListener("resize", layoutPanel);
+		window.removeEventListener("resize", relayoutCanvas);
 		observer.disconnect();
+		stopThemeWatch();
 		removePanel();
 	};
 }
