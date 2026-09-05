@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildTree, closedTurns, emptySidecar, healBranchLinks, parseLog, planRegenerate, serializeLog } from "../lib/tree-model.js";
+import { buildTree, closedTurns, emptySidecar, healBranchLinks, isGenerating, parseLog, planRegenerate, serializeLog } from "../lib/tree-model.js";
 
 function makeTurn(turn, text, baseSeq) {
 	return [
@@ -10,6 +10,17 @@ function makeTurn(turn, text, baseSeq) {
 		{ type: "turn/end", seq: baseSeq + 3, time: 0, data: { turn } }
 	];
 }
+
+test("isGenerating reflects an open (unfinished) turn", () => {
+	assert.equal(isGenerating([]), false);
+	assert.equal(isGenerating([...makeTurn(1, "A", 0)]), false, "closed turn is not generating");
+	const open = [
+		{ type: "turn/start", seq: 0, data: { turn: 1 } },
+		{ type: "user/message", seq: 1, data: { content: [{ type: "text", text: "hi" }], source: { kind: "user" } } },
+		{ type: "assistant/message", seq: 2, data: { turn: 1, message: { role: "assistant", content: [{ type: "text", text: "…" }] } } }
+	];
+	assert.equal(isGenerating(open), true, "missing turn/end means still generating");
+});
 
 test("parseLog/serializeLog round-trips header and events with normalized seq", () => {
 	const text = `${JSON.stringify({ type: "session", id: "s1" })}\n${JSON.stringify({ type: "turn/start", seq: 99, data: { turn: 1 } })}\n`;

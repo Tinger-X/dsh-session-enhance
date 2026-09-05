@@ -43,6 +43,9 @@ const PAD_TOP = 10;
 const DOT_SIZE = 10;
 const DOT_R = DOT_SIZE / 2;
 const DOT_LW = 2;
+// 虚拟头节点：画在首轮上方，把所有 depth1 顶层根并入同一棵视觉树（重生成第1条不再出现两棵树）。
+const HEAD_GAP = 26;
+const HEAD_R = 4;
 // 树列宽：单链/窄树即固定 BASE（一条约 96px 的透明列，图簇在其中水平居中）；
 // 分叉展开超过 BASE 内容时列随图簇加宽，两侧保留 TREE_INSET 对称留白；上限 TREE_MAX_WIDTH。
 const TREE_RAIL_BASE = 96;
@@ -120,6 +123,9 @@ export function installConversationTree(ctx, api) {
 	let themeDarkMedia = null;
 	let themeDarkCb = null;
 	let themeRedrawTimer = null;
+	// 生成中排队的分支操作：等待当前回答完成后自动重放。
+	let pendingOp = null;
+	let pendingTipShown = false;
 
 	/** 解析面板上的分支调色板（alias 变量在面板上下文中求值，跟随主题）。 */
 	function branchPalette() {
@@ -393,7 +399,7 @@ export function installConversationTree(ctx, api) {
 			if (c === void 0) continue;
 			maxDepth = Math.max(maxDepth, node.depth);
 			const x = c * COLUMN_GAP;
-			const y = PAD_TOP + (node.depth - 1) * ROW_GAP + DOT_R;
+			const y = PAD_TOP + HEAD_GAP + (node.depth - 1) * ROW_GAP + DOT_R;
 			positions.set(node.id, { x, y });
 			if (x < minX) minX = x;
 			if (x > maxX) maxX = x;
@@ -405,7 +411,8 @@ export function installConversationTree(ctx, api) {
 		// 把图簇水平中心对齐树列中心。
 		const shift = width / 2 - (minX + maxX) / 2;
 		for (const point of positions.values()) point.x += shift;
-		const height = PAD_TOP + maxDepth * ROW_GAP + DOT_R + 12;
+		// 高度包含头部预留行（虚拟头）。
+		const height = PAD_TOP + HEAD_GAP + maxDepth * ROW_GAP + DOT_R + 12;
 		return { columns: branchIndex, positions, width, height, maxDepth };
 	}
 
@@ -440,7 +447,10 @@ export function installConversationTree(ctx, api) {
 			return value !== "" ? value : fallback;
 		};
 		branchPalette();
-		return { occlude: read("--dsw-alias-bg-layer-2", "#ffffff") };
+		return {
+			occlude: read("--dsw-alias-bg-layer-2", "#ffffff"),
+			neutral: read("--dsw-alias-label-tertiary", "#9aa1ab")
+		};
 	}
 
 	/** 渲染超采样比例：取 ≥2 的整数（devicePixelRatio 兜底），避免亚像素取整造成的锯齿。 */
@@ -547,6 +557,33 @@ export function installConversationTree(ctx, api) {
 		ctx.setTransform(sx, 0, 0, sy, 0, 0);
 		ctx.lineCap = "round";
 
+		// 0) 虚拟头：把所有顶层(depth1、parent=null)节点连到同一个头部圆点 → 视觉恒为单棵树。
+		const tops = renderNodes.filter((m) => m.node !== void 0 && (m.node.parentId === null || m.node.parentId === void 0));
+		let headX = 0;
+		if (tops.length > 0) {
+			let lo = Infinity;
+			let hi = -Infinity;
+			for (const m of tops) {
+				if (m.x < lo) lo = m.x;
+				if (m.x > hi) hi = m.x;
+			}
+			headX = (lo + hi) / 2;
+			const headY = PAD_TOP + DOT_R;
+			ctx.strokeStyle = drawColors.neutral;
+			ctx.globalAlpha = 0.45;
+			ctx.lineWidth = 1.4;
+			for (const m of tops) {
+				const from = { x: headX, y: headY + HEAD_R };
+				const to = { x: m.x, y: m.y - DOT_R };
+				const midY = (from.y + to.y) / 2;
+				ctx.beginPath();
+				ctx.moveTo(from.x, from.y);
+				ctx.bezierCurveTo(from.x, midY, to.x, midY, to.x, to.y);
+				ctx.stroke();
+			}
+			ctx.globalAlpha = 1;
+		}
+
 		// 1) 连线（圆点下层）。活动路径加粗高亮，非活动弱化。
 		for (const edge of renderEdges) {
 			ctx.globalAlpha = edge.active ? 0.95 : 0.34;
@@ -566,6 +603,15 @@ export function installConversationTree(ctx, api) {
 		// 2) 节点圆点（上层）。先复位 alpha，避免上一条边的透明度漏进圆点底色。
 		ctx.globalAlpha = 1;
 		for (const marker of renderNodes) drawNodeMarker(ctx, marker);
+
+		// 3) 虚拟头圆点（中性、小、淡；无交互）。
+		if (tops.length > 0) {
+			ctx.beginPath();
+			ctx.arc(headX, PAD_TOP + DOT_R, HEAD_R, 0, Math.PI * 2);
+			ctx.fillStyle = drawColors.neutral;
+			ctx.globalAlpha = 0.85;
+			ctx.fill();
+		}
 		ctx.globalAlpha = 1;
 	}
 
@@ -739,6 +785,8 @@ export function installConversationTree(ctx, api) {
 			}
 			injectReplyActions();
 			injectUserActions();
+			// 生成结束（idle）且有待执行的分支操作 → 自动重放（挂起期间回答已完整归档回原分支）。
+			if (pendingOp !== null && next && next.generating === false) drainPendingOp();
 		} catch (error) {
 			if (tree === null) {
 				tree = { nodes: [], activePath: [], branches: [], branchPoints: {}, activeBranchId: "root" };
@@ -937,40 +985,61 @@ export function installConversationTree(ctx, api) {
 		function send() {
 			const sid = currentSessionId();
 			if (sid === null) return;
-			api.editAndRegenerate(sid, node.id, textarea.value).then(() => {
-				tree = null;
-				load();
-				resync(sid);
-			}).catch((error) => {
-				console.warn("[dsh-session-enhance] editAndRegenerate failed:", error);
-			});
+			void applyBranchOp({ kind: "regen", nodeId: node.id, text: textarea.value, edit: true });
 		}
 	}
 
-	async function switchTo(branchId) {
+	/** 生成中：把分支操作挂起，等当前回答结束自动重放；给出轻提示。 */
+	function pendingAnchor() {
+		const rect = (canvasEl !== null && canvasEl.isConnected) ? canvasEl.getBoundingClientRect() : { left: 0, top: 0, right: 0, bottom: 0, width: 0, height: 0 };
+		return { getBoundingClientRect: () => rect };
+	}
+	function setPendingOp(op) {
+		pendingOp = op;
+		if (!pendingTipShown) {
+			pendingTipShown = true;
+			const text = op.kind === "switch" ? "正在生成，完成后将自动切换…" : "正在生成，完成后将自动重新生成…";
+			showActionTip(text, pendingAnchor());
+		}
+	}
+
+	/** 执行一次分支操作；遇 busy 则挂起待生成结束重放。 */
+	async function applyBranchOp(op) {
 		const sid = currentSessionId();
 		if (sid === null) return;
 		try {
-			await api.switchBranch(sid, branchId);
+			let result;
+			if (op.kind === "switch") result = await api.switchBranch(sid, op.branchId);
+			else if (op.edit) result = await api.editAndRegenerate(sid, op.nodeId, op.text);
+			else result = await api.regenerate(sid, op.nodeId);
+			if (result !== null && result !== void 0 && result.busy) {
+				setPendingOp(op);
+				return;
+			}
 			tree = null;
 			await load();
 			await resync(sid);
 		} catch (error) {
-			console.warn("[dsh-session-enhance] switchBranch failed:", error);
+			console.warn("[dsh-session-enhance] branch operation failed:", error);
 		}
 	}
 
-	async function doRegenerate(node) {
-		const sid = currentSessionId();
-		if (sid === null) return;
-		try {
-			await api.regenerate(sid, node.id);
-			tree = null;
-			await load();
-			await resync(sid);
-		} catch (error) {
-			console.warn("[dsh-session-enhance] regenerate failed:", error);
-		}
+	/** 会话空闲时把挂起的操作重放掉。 */
+	function drainPendingOp() {
+		const op = pendingOp;
+		if (op === null) return;
+		pendingOp = null;
+		pendingTipShown = false;
+		hideActionTip();
+		void applyBranchOp(op);
+	}
+
+	function switchTo(branchId) {
+		void applyBranchOp({ kind: "switch", branchId });
+	}
+
+	function doRegenerate(node) {
+		void applyBranchOp({ kind: "regen", nodeId: node.id });
 	}
 
 	/** 分支操作改写了主干工件与宿主实时会话 log，但客户端会话镜像
@@ -1089,6 +1158,8 @@ export function installConversationTree(ctx, api) {
 		if (sid !== currentSid) {
 			currentSid = sid;
 			tree = null;
+			pendingOp = null;
+			pendingTipShown = false;
 			watchSessionInstance(sid);
 		}
 		scheduleLoad();
