@@ -12,5 +12,6 @@ Thumbs.db
 .idea/
 .vscode/
 .claude/
+.trae/
 
 .local

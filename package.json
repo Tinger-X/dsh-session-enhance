@@ -1,9 +1,9 @@
 {
   "name": "dsh-session-enhance",
-  "version": "0.2.8",
-  "description": "DSH Web plugin for managing sessions: archive/unarchive, guaranteed physical deletion (transcript files + ~/storages/*.json sweep), and drag-and-drop workspace reassignment.",
+  "version": "0.2.9",
+  "description": "Conversation-enhance plugin for DeepSeek Harness Web: archive & preview sessions, guaranteed physical delete, drag-and-drop session moves between workspaces, conversation notifications, copy session ID, and a branchable conversation tree.",
   "type": "module",
-  "packageManager": "pnpm@11.24.0",
+  "packageManager": "pnpm@11.25.0",
   "engines": {
     "node": "^22.19.0 || >=24.0.0"
   },
