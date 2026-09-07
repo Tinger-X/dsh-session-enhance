@@ -11,6 +11,10 @@ import { fileURLToPath } from "node:url";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 
+// 外部依赖（react / react/* / @deepseek-ai/*）由 DSH 浏览器运行时的模块加载器
+// 在运行时注入，因此标记为 external。0.1.2-rc.1 的 `dsh-client-store` 与
+// `dsh-client-ui-primitives` 是浏览器模块表里的 source-level 包（工作区插件
+// 同样以 `require()` 运行时加载），故与旧版一样保持 external，而非打进 bundle。
 const externalPlugin = {
 	name: "dsh-external",
 	setup(ctx) {

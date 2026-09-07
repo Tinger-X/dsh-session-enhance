@@ -2,7 +2,7 @@
 
 **Conversation enhancement for DeepSeek Harness Web.** Manage sessions like a real tool, not a list of JSON files: archive and restore chats, guarantee physical deletion, drag sessions between workspaces, branch any conversation and switch freely, and get notified the moment a background conversation needs you.
 
-![License](https://img.shields.io/badge/license-Apache--2.0-blue) ![DSH](https://img.shields.io/badge/DSH-0.1.1--rc.2-green) ![Node](https://img.shields.io/badge/node-%5E22.19%20%7C%7C%20%3E%3D24-339933) ![Type](https://img.shields.io/badge/type-ESM-4B32C3)
+![License](https://img.shields.io/badge/license-Apache--2.0-blue) ![DSH](https://img.shields.io/badge/DSH-0.1.2--rc.1-green) ![Node](https://img.shields.io/badge/node-%5E22.19%20%7C%7C%20%3E%3D24-339933) ![Type](https://img.shields.io/badge/type-ESM-4B32C3)
 
 [简体中文](README.zh-CN.md)
 

@@ -7,6 +7,7 @@ import { WorkspacePicker } from "./workspace-picker.js";
 import { installConversationTree } from "./tree.js";
 import { displayTitle } from "./rows.js";
 import { sessionVisible, isUnknownSessionError, deriveGroups, deriveFlat, deriveSearchResults, groupByWorkspace, byRecency } from "./derive.js";
+import { SessionEnhanceUiWorkspaceService } from "./ui-workspace-service.js";
 
 /** Dictionary namespace owned by this plugin. */
 const NS = "workspace";
@@ -24,7 +25,7 @@ const inject = [
 	"workspaces",
 	"locale",
 	"remote",
-	"typert"
+	"remote.directoryPicker"
 ];
 /**
 * Plugin body: mount the dsh-session-enhance Remote contribution, then
@@ -36,10 +37,16 @@ const inject = [
 * @param ctx - client root context.
 */
 async function apply(ctx) {
-	const remote = ctx.get("remote");
+	const remote = ctx.remote;
 	let disposeRemote = () => { };
+	const sessions = ctx.get("sessions");
+	const workspaces = ctx.get("workspaces");
+	// 复刻被禁用的 `ui-workspace`：同步注册 `uiWorkspace` 服务（侧栏/对话/目录
+	// 选择器都依赖它）并接管 `useWorkspaces` 根 hook，让依赖方尽快激活。
+	const uiWorkspace = new SessionEnhanceUiWorkspaceService(ctx, ctx.remote.directoryPicker, workspaces, sessions);
+	ctx.slots.provideRoot({ hooks: { workspaces: workspaces.list } });
 	if (remote !== void 0) disposeRemote = await remote.$mount(SESSION_ENHANCE_REMOTE);
-	applyWorkspaceBrowser(ctx);
+	applyWorkspaceBrowser(ctx, uiWorkspace);
 	return async () => {
 		await disposeRemote();
 	};
@@ -50,7 +57,7 @@ async function apply(ctx) {
 * framework's global hooks.
 * @param ctx - client root context.
 */
-function applyWorkspaceBrowser(ctx) {
+function applyWorkspaceBrowser(ctx, uiWorkspace) {
 	ctx.effect(() => ctx.locale.register(NS, {
 		zh,
 		en
@@ -242,10 +249,9 @@ function applyWorkspaceBrowser(ctx) {
 	ctx.effect(() => installConversationNotifier(ctx, getSettings, ctx.locale.bind(NS)), "dsh-session-enhance: conversation notifier");
 	// PLUS：对话树（左侧树形面板 + 分支切换 + 编辑/重新生成）。
 	ctx.effect(() => installConversationTree(ctx, { readTree, regenerate, editAndRegenerate, switchBranch, t: ctx.locale.bind(NS) }), "dsh-session-enhance: conversation tree");
+	/** PLUS：新建会话——复用目标工作区的空会话，否则创建并打开（走 uiWorkspace 服务）。 */
 	const browserInjected = () => ({
-		startSession: (workspaceId) => {
-			ctx.workspaces.startSession(workspaceId);
-		},
+		startSession: (workspaceId) => uiWorkspace.startSession(workspaceId),
 		open: (sessionId) => {
 			ctx.sessions.open(sessionId);
 		},
@@ -318,9 +324,22 @@ function applyWorkspaceBrowser(ctx) {
 		label: () => ctx.locale.bind(NS)("settings.manageTitle"),
 		icon: "settings",
 		locale: NS,
-		inject: () => ({
-			sessionStore: ctx.sessions.list,
-			workspaceStore: ctx.workspaces.list,
+		inject: () => {
+			// 0.1.2-rc.1 的 `ctx.workspaces.list`（WorkspaceSource）的
+			// subscribe/getSnapshot 是原型方法（依赖 `this`），直接解引用传给
+			// useSyncExternalStore 会因 `this` 丢失而崩溃；这里用箭头函数包一层
+			// 绑死 store（会话 store 同样包装，保持一致）。
+			const sessionList = ctx.sessions.list;
+			const workspaceList = ctx.workspaces.list;
+			return {
+			sessionStore: {
+				getSnapshot: () => sessionList.getSnapshot(),
+				subscribe: (listener) => sessionList.subscribe(listener)
+			},
+			workspaceStore: {
+				getSnapshot: () => workspaceList.getSnapshot(),
+				subscribe: (listener) => workspaceList.subscribe(listener)
+			},
 			unarchiveSession,
 			deleteSession,
 			unarchiveSessions,
@@ -335,9 +354,10 @@ function applyWorkspaceBrowser(ctx) {
 			deleteWorkspace: async (workspaceId) => {
 				await ctx.workspaces.delete(workspaceId);
 			},
-			pickDirectory: () => ctx.workspaces.pickDirectory(),
+			pickDirectory: () => uiWorkspace.pickDirectory(),
 			t: ctx.locale.bind(NS)
-		})
+		};
+	}
 	}, EnhancementSection));
 }
 

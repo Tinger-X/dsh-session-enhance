@@ -2,7 +2,7 @@
 
 **面向 DeepSeek Harness Web 的对话增强插件。** 让会话管理真正像工具而非一摞 JSON 文件：归档与恢复对话、保证物理删除、跨工作区拖拽会话、把任意对话变成可自由切换分支的树，以及后台对话需要你时第一时间通知你。
 
-![License](https://img.shields.io/badge/license-Apache--2.0-blue) ![DSH](https://img.shields.io/badge/DSH-0.1.1--rc.2-green) ![Node](https://img.shields.io/badge/node-%5E22.19%20%7C%7C%20%3E%3D24-339933) ![Type](https://img.shields.io/badge/type-ESM-4B32C3)
+![License](https://img.shields.io/badge/license-Apache--2.0-blue) ![DSH](https://img.shields.io/badge/DSH-0.1.2--rc.1-green) ![Node](https://img.shields.io/badge/node-%5E22.19%20%7C%7C%20%3E%3D24-339933) ![Type](https://img.shields.io/badge/type-ESM-4B32C3)
 
 [English](README.md)
 

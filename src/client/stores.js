@@ -1,4 +1,4 @@
-import * as _deepseek_ai_dsh_client_runtime_client from "@deepseek-ai/dsh-client-runtime/client";
+import { defineStore } from "@deepseek-ai/dsh-client-store";
 
 /**
 * The workspace browser's viewing store: the session-list grouping mode,
@@ -14,7 +14,7 @@ const FLAT_SESSION_ORDER_KEY = "__flat_session_order__";
 * @returns the store handle (spec + type + identity + factory in one).
 */
 function createWorkspaceViewStore() {
-	return (0, _deepseek_ai_dsh_client_runtime_client.defineStore)({
+	return defineStore({
 		init: () => ({
 			groupBy: "workspace",
 			orderBy: "updated",

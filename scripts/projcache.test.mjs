@@ -239,11 +239,14 @@ function makeWarmCache({ list, rows = [], live = [], deleted = [], coldRead, col
 	cache.deletedSessionIds = new Set(deleted);
 	cache.warmConcurrency = 2;
 	cache.requireTable = () => ({ get: (id) => rowSet.has(id) ? {} : void 0 });
-	cache.coldSnapshot = coldSnapshot ?? (async (id) => {
-		coldRead?.push(id);
+	cache.coldSnapshot = coldSnapshot ?? ((meta) => {
+		coldRead?.push(meta.id);
 	});
 	cache.ctx = {
-		sessionPersistence: list === void 0 ? void 0 : { list: async () => list.map((id) => ({ id })) },
+		sessionPersistence: list === void 0 ? void 0 : {
+			list: async () => list.map((id) => ({ id })),
+			inspect: async (id) => ({ meta: { id }, inheritedEventCount: 0, events: [] })
+		},
 		get: (name) => name === "sessions" ? { get: (id) => liveSet.has(id) ? {} : void 0 } : void 0,
 		logger: { info() {}, warn() {} }
 	};
@@ -268,9 +271,9 @@ test("warmUncachedProjections: one failing cold read does not abort the rest", a
 	const cache = makeWarmCache({
 		list: ["boom", "ok-1", "ok-2"],
 		coldRead,
-		coldSnapshot: async (id) => {
-			coldRead.push(id);
-			if (id === "boom") throw new Error("cold-read blew up");
+		coldSnapshot: async (meta) => {
+			coldRead.push(meta.id);
+			if (meta.id === "boom") throw new Error("cold-read blew up");
 		}
 	});
 	await cache.warmUncachedProjections();
