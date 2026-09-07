@@ -1,4 +1,32 @@
-import * as _deepseek_ai_dsh_client_runtime_client from "@deepseek-ai/dsh-client-runtime/client";
+/**
+ * Index uninterrupted subagent descendants under each ancestor (local copy of
+ * the 0.1.2-rc.1 `dsh-client-ui-workspace` lineage helper, which is bundled
+ * rather than exported; the old `dsh-client-runtime` package no longer exists).
+ * @param summaries - Session summaries keyed by id.
+ * @returns descendant totals keyed by possible parent id.
+ */
+function indexSubagentDescendants(summaries) {
+	const indexed = /* @__PURE__ */ new Map();
+	for (const descendant of Object.values(summaries)) {
+		if (descendant.origin !== "subagent") continue;
+		const seen = /* @__PURE__ */ new Set();
+		let current = descendant;
+		while (current?.origin === "subagent" && current.parentId !== void 0 && !seen.has(current.id)) {
+			seen.add(current.id);
+			const aggregate = indexed.get(current.parentId);
+			if (aggregate === void 0) indexed.set(current.parentId, {
+				count: 1,
+				runningCount: descendant.running ? 1 : 0
+			});
+			else {
+				aggregate.count += 1;
+				if (descendant.running) aggregate.runningCount += 1;
+			}
+			current = summaries[current.parentId];
+		}
+	}
+	return indexed;
+}
 
 /** Display label for the ungrouped bucket row. */
 const UNGROUPED_LABEL = "Ungrouped";
@@ -146,7 +174,7 @@ function sessionNode(s, descendants, archived) {
 function deriveGroups(list, workspaces, archivedSessionIds, view) {
 	const archived = new Set(archivedSessionIds);
 	const expandedGroups = new Set(view.expandedGroups);
-	const descendants = (0, _deepseek_ai_dsh_client_runtime_client.indexSubagentDescendants)(list.byId);
+	const descendants = indexSubagentDescendants(list.byId);
 	const currentGroup = list.current === void 0 ? void 0 : workspaces.find((w) => w.sessionIds.includes(list.current))?.workspaceId ?? "";
 	const groups = [];
 	for (const g of groupByWorkspace(list, workspaces, archived, view.ungroupedOrder, view.showArchived)) {
@@ -179,7 +207,7 @@ function deriveGroups(list, workspaces, archivedSessionIds, view) {
 */
 function deriveFlat(list, archivedSessionIds, showArchived) {
 	const archived = new Set(archivedSessionIds);
-	const descendants = (0, _deepseek_ai_dsh_client_runtime_client.indexSubagentDescendants)(list.byId);
+	const descendants = indexSubagentDescendants(list.byId);
 	const rows = [];
 	for (const id of list.ids) {
 		const s = list.byId[id];
@@ -210,7 +238,7 @@ function deriveSearchResults(list, workspaces, query, archivedSessionIds, conten
 		hasMore: false
 	};
 	const archived = new Set(archivedSessionIds);
-	const descendants = (0, _deepseek_ai_dsh_client_runtime_client.indexSubagentDescendants)(list.byId);
+	const descendants = indexSubagentDescendants(list.byId);
 	const workspaceBySession = /* @__PURE__ */ new Map();
 	for (const workspace of workspaces) for (const sessionId of workspace.sessionIds) if (!workspaceBySession.has(sessionId)) workspaceBySession.set(sessionId, workspace.title);
 	const labelOf = (summary) => workspaceBySession.get(summary.id) ?? workspaceLabel(summary.cwd);
